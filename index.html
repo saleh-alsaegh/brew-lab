@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brew Lab — espresso, cold and filter dial-in</title>
+<script>
+(function(){var t;try{t=localStorage.getItem('brewlab.theme')}catch(e){}
+if(!t)t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+document.documentElement.dataset.theme=t})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=JetBrains+Mono:wght@500;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ---------- tokens ---------- */
+:root{
+  --bg:#e7e2da; --ink:#2a2420; --ink-2:#5d544b; --line:rgba(90,75,60,.16);
+  --sh-d:rgba(158,142,122,.62); --sh-l:rgba(255,255,255,.92);
+  --accent:#b3591f; --accent-2:#cf7a3a; --on-accent:#fff;
+  --good:#286b4a; --warn:#8a5a00; --bad:#b23a34;
+  --c-a:#b3591f; --c-b:#1d6f8f; --c-c:#286b4a;
+  --steel-1:#e4e4e0; --steel-2:#b7b7b2; --steel-ink:#2c2c2b;
+  --glass-st:rgba(70,58,46,.38); --glass-fill:rgba(255,255,255,.34); --water:rgba(96,160,205,.38);
+  --grip-a:rgba(60,48,38,.20); --grip-b:rgba(255,255,255,.55);
+  --raise:9px 9px 20px var(--sh-d),-9px -9px 20px var(--sh-l);
+  --raise-sm:5px 5px 11px var(--sh-d),-5px -5px 11px var(--sh-l);
+  --raise-xs:3px 3px 6px var(--sh-d),-3px -3px 6px var(--sh-l);
+  --inset:inset 5px 5px 10px var(--sh-d),inset -5px -5px 10px var(--sh-l);
+  --inset-sm:inset 2px 2px 5px var(--sh-d),inset -2px -2px 5px var(--sh-l);
+  --spot:rgba(255,255,255,.42); --sheen:.5;
+  --display:'Fraunces',Georgia,'Times New Roman',serif;
+  --font:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+}
+:root[data-theme=dark]{
+  color-scheme:dark;
+  --bg:#262320; --ink:#f1ebe3; --ink-2:#b5ab9f; --line:rgba(255,240,220,.10);
+  --sh-d:rgba(0,0,0,.58); --sh-l:rgba(255,238,215,.055);
+  --accent:#e8a05a; --accent-2:#f3b878; --on-accent:#2a1a0c;
+  --good:#74d0a0; --warn:#efc062; --bad:#f18d83;
+  --c-a:#e8a05a; --c-b:#6cc3dc; --c-c:#74d0a0;
+  --steel-1:#77766f; --steel-2:#4a4944; --steel-ink:#f2f2ee;
+  --glass-st:rgba(255,255,255,.30); --glass-fill:rgba(255,255,255,.05); --water:rgba(110,180,225,.30);
+  --grip-a:rgba(0,0,0,.45); --grip-b:rgba(255,240,220,.16);
+  --spot:rgba(255,236,210,.05); --sheen:.07;
+}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0;background:var(--bg);color:var(--ink);font:500 14px/1.45 var(--font);-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:8px}
+svg.ic{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- layout ---------- */
+.app{max-width:1340px;margin:0 auto;padding:20px 20px 36px}
+.bar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 16px;border-radius:26px;box-shadow:var(--raise);margin-bottom:24px}
+.brand{display:flex;align-items:center;gap:12px;margin-right:auto}
+.logo{width:44px;height:44px;border-radius:15px;display:grid;place-items:center;box-shadow:var(--raise-sm);color:var(--accent)}
+.logo svg{width:24px;height:24px}
+.brand b{display:block;font:700 21px/1.1 var(--display);letter-spacing:-.01em}
+.brand small{color:var(--ink-2);font-size:12px;font-weight:600}
+.tools{display:flex;gap:10px;margin-left:auto}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.span-2{grid-column:span 2}.span-3{grid-column:1/-1}
+.card{position:relative;isolation:isolate;border-radius:26px;box-shadow:var(--raise);padding:22px;min-width:0;display:flex;flex-direction:column}
+/* pointer-following highlight on the soft surface */
+@media (hover:hover) and (pointer:fine){
+  .card::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .35s;background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%),var(--spot),transparent 72%)}
+  .card:hover::before{opacity:1}
+}
+/* light that circles the brew card while a brew runs */
+@property --beam{syntax:'<angle>';inherits:false;initial-value:0deg}
+.beam{position:absolute;inset:0;border-radius:inherit;padding:2px;pointer-events:none;opacity:0;transition:opacity .5s;background:conic-gradient(from var(--beam),transparent 0 70%,var(--accent-2) 88%,var(--accent) 96%,transparent 100%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.is-brewing .beam{opacity:1;animation:beam 3.4s linear infinite}
+@keyframes beam{to{--beam:360deg}}
+.shimmer{background:linear-gradient(90deg,var(--ink-2) 0 35%,var(--ink) 50%,var(--ink-2) 65% 100%) 0 0/220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:shim 2.2s linear infinite}
+@keyframes shim{from{background-position:100% 0}to{background-position:-120% 0}}
+.enter>*{animation:rise .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*70ms)}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+.rip{position:absolute;border-radius:50%;background:rgba(255,255,255,.45);transform:scale(0);animation:rip .6s ease-out forwards;pointer-events:none}
+@keyframes rip{to{transform:scale(2.2);opacity:0}}
+.confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
+.card-hero{background:linear-gradient(150deg,color-mix(in srgb,var(--accent) 10%,var(--bg)),var(--bg) 60%)}
+.card-h{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.step{font:700 11px var(--mono);color:var(--accent);width:30px;height:30px;border-radius:10px;display:grid;place-items:center;box-shadow:var(--inset-sm);flex:none}
+.card-h h2{font:700 19px/1.2 var(--display);letter-spacing:-.005em}
+.card-h .sub{color:var(--ink-2);font-size:12px;font-weight:600}
+.card-h>div:not(.seg){min-width:0}
+#cupExtra{margin-top:16px}
+.sp{flex:1}
+.label{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2);margin:16px 0 9px}
+.label:first-child{margin-top:0}
+.note{color:var(--ink-2);font-size:12.5px;margin-top:10px;min-height:2.9em}
+.foot{color:var(--ink-2);font-size:12px;text-align:center;margin-top:28px}
+
+/* ---------- controls ---------- */
+.chip{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:700;box-shadow:var(--inset-sm);color:var(--ink-2);white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip[data-tone=good]{color:var(--good)}.chip[data-tone=warn]{color:var(--warn)}.chip[data-tone=bad]{color:var(--bad)}.chip[data-tone=accent]{color:var(--accent)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:14px;font-weight:700;font-size:13px;box-shadow:var(--raise-sm);transition:box-shadow .16s,color .16s,filter .16s}
+.btn:hover{color:var(--accent)}
+.btn:active{box-shadow:var(--inset-sm)}
+.btn.primary{position:relative;overflow:hidden;background:linear-gradient(145deg,var(--accent-2),var(--accent));color:var(--on-accent)}
+.btn.primary:hover{filter:brightness(1.07);color:var(--on-accent)}
+.btn.primary:active{box-shadow:inset 3px 3px 7px rgba(0,0,0,.28);filter:none}
+.btn.sm{padding:7px 11px;font-size:12px;border-radius:11px;box-shadow:var(--raise-xs)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.icon-btn{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;box-shadow:var(--raise-sm);color:var(--ink-2);transition:box-shadow .16s,color .16s}
+.icon-btn:hover{color:var(--accent)}.icon-btn:active,.icon-btn[aria-pressed=true]{box-shadow:var(--inset-sm);color:var(--accent)}
+.seg{position:relative;display:inline-flex;gap:4px;padding:5px;border-radius:16px;box-shadow:var(--inset-sm)}
+.seg .pill{position:absolute;top:5px;bottom:5px;left:0;width:var(--w,0);transform:translateX(var(--x,0));border-radius:12px;background:var(--bg);box-shadow:var(--raise-xs);pointer-events:none;transition:transform .32s cubic-bezier(.4,0,.2,1),width .32s cubic-bezier(.4,0,.2,1),opacity .2s}
+.seg.full{display:flex}.seg.full button{flex:1}
+.seg button{padding:8px 12px;border-radius:12px;font-weight:700;font-size:12.5px;color:var(--ink-2);transition:box-shadow .16s,color .16s;white-space:nowrap}
+.seg button{position:relative;z-index:1}
+.seg button:hover{color:var(--ink)}
+.seg button.is-rec::after{content:"";position:absolute;left:50%;bottom:2px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--accent)}
+.btn[aria-pressed=true]{box-shadow:var(--inset-sm);color:var(--accent)}
+.cc-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font-size:11.5px;color:var(--ink-2);font-weight:600}
+.cc-legend span{display:flex;align-items:center;gap:7px}
+.cc-legend i{width:10px;height:10px;border-radius:50%;flex:none}
+.seg button[aria-pressed=true]{color:var(--accent)}
+.seg-method button{display:flex;align-items:center;gap:10px;padding:9px 16px;text-align:left}
+.seg-method b{display:block;font-size:13px;font-weight:800;line-height:1.2}
+.seg-method small{display:block;font-size:11px;font-weight:600;color:var(--ink-2)}
+.tog{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border-radius:14px;box-shadow:var(--raise-xs);font-weight:700;font-size:12.5px;text-align:left;transition:box-shadow .16s}
+.tog small{display:block;font-weight:600;font-size:11px;color:var(--ink-2)}
+.tog>span{flex:1;min-width:0}
+.tog i{position:relative;width:40px;height:22px;border-radius:99px;box-shadow:var(--inset-sm);flex:none}
+.tog i::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--bg);box-shadow:var(--raise-xs);transition:transform .28s cubic-bezier(.175,.885,.32,1.275),background .2s,box-shadow .2s}
+.tog[aria-pressed=true] i::after{transform:translateX(18px);background:var(--accent);box-shadow:0 0 9px color-mix(in srgb,var(--accent) 65%,transparent)}
+.togs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.togs .tog:last-child:nth-child(odd){grid-column:1/-1}
+
+.field{margin-top:14px}
+.field:first-child{margin-top:0}
+.field-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.field-top label{font-weight:700;font-size:13px}
+.field-top output{font:700 14px var(--mono);color:var(--accent)}
+.field-hint{font-size:11.5px;color:var(--ink-2);margin-top:1px;min-height:1.4em}
+.range{position:relative;display:block;height:30px}
+.range input{-webkit-appearance:none;appearance:none;width:100%;height:30px;margin:0;background:transparent;cursor:pointer;display:block}
+.range input::-webkit-slider-runnable-track{height:10px;border-radius:99px;background:linear-gradient(90deg,var(--accent-2),var(--accent)) 0 0/var(--p,50%) 100% no-repeat,var(--bg);box-shadow:var(--inset-sm)}
+.range input::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;margin-top:-7px;border-radius:50%;border:0;background:radial-gradient(circle,var(--accent) 0 3.5px,transparent 4.5px),var(--bg);box-shadow:var(--raise-xs)}
+.range input::-moz-range-track{height:10px;border-radius:99px;background:var(--bg);box-shadow:var(--inset-sm)}
+.range input::-moz-range-progress{height:10px;border-radius:99px;background:linear-gradient(90deg,var(--accent-2),var(--accent))}
+.range input::-moz-range-thumb{width:24px;height:24px;border:0;border-radius:50%;background:radial-gradient(circle,var(--accent) 0 3.5px,transparent 4.5px),var(--bg);box-shadow:var(--raise-xs)}
+.range .rec{position:absolute;top:-3px;width:3px;height:8px;border-radius:2px;background:var(--accent);left:calc(12px + (100% - 24px)*var(--r,.5));margin-left:-1.5px;pointer-events:none}
+.range .rec[hidden]{display:none}
+.date{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:12.5px;font-weight:700}
+.date input{font:600 12.5px var(--mono);color:var(--ink);background:var(--bg);border:0;border-radius:11px;padding:8px 10px;box-shadow:var(--inset-sm);color-scheme:inherit}
+
+/* ---------- beans ---------- */
+.roasts{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.roast{display:flex;flex-direction:column;align-items:center;gap:9px;padding:6px 2px;font-size:11.5px;font-weight:700;color:var(--ink-2);border-radius:14px}
+.roast .bean{width:46px;height:46px;border-radius:50%;box-shadow:var(--raise-sm);display:grid;place-items:center;transition:box-shadow .18s}
+.roast .bean svg{width:26px;height:26px}
+.roast[aria-pressed=true]{color:var(--ink)}
+.roast[aria-pressed=true] .bean{box-shadow:var(--inset-sm),0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+
+/* ---------- perfect settings ---------- */
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tile{padding:11px 13px;border-radius:18px;box-shadow:var(--inset-sm);min-width:0}
+.tile .k{font-size:10.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.09em}
+.tile .v{font:700 23px/1.2 var(--mono);letter-spacing:-.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .v small{font-size:12px;color:var(--ink-2);font-weight:500;letter-spacing:0;margin-left:3px}
+.tile .n{font-size:11.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.off .n{color:var(--warn);font-weight:700}
+.predict{display:flex;align-items:center;gap:12px;margin:16px 0 4px;font-size:12.5px;color:var(--ink-2);font-weight:600}
+.predict b{font:700 22px var(--mono);color:var(--accent)}
+.why{margin:8px 0 16px;padding:0;list-style:none;font-size:12.5px;color:var(--ink-2);flex:1}
+.why li{padding-left:16px;position:relative;margin-top:5px}
+.why li::before{content:"";position:absolute;left:2px;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+/* ---------- dial it in ---------- */
+.panes{display:grid;grid-template-columns:1fr 1.05fr 1fr;gap:30px}
+.pane{min-width:0}
+.pane+.pane{border-left:1px solid var(--line);padding-left:30px}
+.pane-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:16px}
+.pane-h b{font-size:13px;font-weight:800}
+.pane-h span{font-size:12px;color:var(--ink-2);font-weight:600}
+.knob{position:relative;width:236px;height:236px;margin:0 auto;border-radius:50%;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.knob:active{cursor:grabbing}
+.knob[aria-disabled=true]{opacity:.45;pointer-events:none}
+.knob-well{position:absolute;inset:0;border-radius:50%;box-shadow:var(--inset)}
+.knob svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.knob svg line{stroke:var(--ink-2);stroke-width:1.4;stroke-linecap:round;opacity:.55}
+.knob svg line.maj{opacity:1;stroke-width:2}
+.knob svg text{font:700 10px var(--mono);fill:var(--ink-2);text-anchor:middle;dominant-baseline:central}
+.knob svg circle.recdot{fill:var(--accent)}
+.knob-cap{position:absolute;inset:50px;border-radius:50%;box-shadow:var(--raise);background:conic-gradient(from 30deg,transparent 0 4%,rgba(255,255,255,var(--sheen)) 12%,transparent 22% 46%,rgba(255,255,255,var(--sheen)) 58%,transparent 70% 100%),var(--bg)}
+.knob-rot{position:absolute;inset:0;border-radius:50%;transition:transform .35s cubic-bezier(.175,.885,.32,1.275)}
+.knob.dragging .knob-rot{transition:none}
+.knob-rot::before{content:"";position:absolute;inset:5px;border-radius:50%;background:repeating-conic-gradient(var(--grip-a) 0 2.5deg,var(--grip-b) 2.5deg 5deg);-webkit-mask:radial-gradient(circle,transparent 0 60%,#000 61% 69%,transparent 70%);mask:radial-gradient(circle,transparent 0 60%,#000 61% 69%,transparent 70%)}
+.knob-rot::after{content:"";position:absolute;left:50%;top:9px;width:6px;height:16px;margin-left:-3px;border-radius:3px;background:var(--accent);box-shadow:0 0 8px color-mix(in srgb,var(--accent) 70%,transparent)}
+.knob-read{position:absolute;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none}
+.knob-read b{font:700 38px/1 var(--mono);letter-spacing:-.04em}
+.knob-read span{font-size:11px;color:var(--ink-2);font-weight:700;margin-top:4px}
+.knob-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px}
+.knob-row .zone{flex:1;text-align:center;font-size:12px;font-weight:700;min-width:0}
+.knob-row .zone small{display:block;color:var(--ink-2);font-weight:600;font-size:11.5px}
+
+/* ---------- machine panels (skeuomorphic) ---------- */
+.machine{position:relative;max-width:300px;margin:0 auto;border-radius:22px;padding:14px 14px 16px;background:linear-gradient(180deg,var(--steel-1),var(--steel-2));box-shadow:var(--raise-sm),inset 0 1px 0 rgba(255,255,255,.45);overflow:hidden}
+.machine::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 1px,rgba(0,0,0,.035) 1px 3px);pointer-events:none}
+.machine .mname{position:relative;text-align:center;font:800 12px var(--font);letter-spacing:.3em;text-transform:uppercase;color:var(--steel-ink);opacity:.72;margin-top:12px;text-shadow:0 1px 0 rgba(255,255,255,.3)}
+.glass{position:relative;border-radius:16px;padding:14px 24px 16px;background:linear-gradient(180deg,#1d1d1f,#0c0c0d);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),inset 0 3px 10px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.35)}
+.lcd{display:flex;align-items:center;justify-content:center;gap:8px;height:50px}
+.lcd svg{height:34px;width:auto}
+.lcd .seg-on{fill:#f4f6f8}.lcd .seg-off{fill:#222325}
+.lcd .ann{display:flex;flex-direction:column;gap:3px;font:800 8px var(--font);letter-spacing:.08em;color:#333436}
+.lcd .ann .on{color:#f4f6f8}
+.mrounds{display:flex;justify-content:center;gap:22px;margin:8px 0 12px}
+.mround{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,#ececea,#b9b9b5);color:#1c1c1c;font:800 11px var(--font);box-shadow:0 2px 0 #6f6f72,0 4px 7px rgba(0,0,0,.7),inset 0 1px 0 #fff}
+.mround svg.ic{width:15px;height:15px;stroke-width:2.2}
+.mrow{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-top:10px}
+.mbtn{position:relative;height:32px;border-radius:999px;background:linear-gradient(180deg,#ececea,#b9b9b5);color:#1c1c1c;font:800 10.5px var(--font);letter-spacing:.09em;box-shadow:0 2px 0 #6f6f72,0 4px 7px rgba(0,0,0,.7),inset 0 1px 0 #fff;transition:transform .08s,box-shadow .08s}
+.mbtn.wide{grid-column:1/-1}
+.mbtn:active,.mround:active{transform:translateY(2px);box-shadow:0 0 0 #6f6f72,0 1px 3px rgba(0,0,0,.7),inset 0 2px 4px rgba(0,0,0,.3)}
+.led{position:absolute;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:#353638;transition:background .15s,box-shadow .15s}
+.led.l{left:-14px}.led.r{right:-14px}
+.led.on{background:#fff;box-shadow:0 0 7px 1px rgba(255,255,255,.85)}
+.led.warm.on{background:#ff7a2e;box-shadow:0 0 8px 1px rgba(255,122,46,.9)}
+.mhelp{font-size:11.5px;color:var(--ink-2);text-align:center;margin-top:14px;min-height:2.9em}
+.progs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pbtn{display:flex;flex-direction:column;align-items:center;gap:6px;font:800 9px var(--font);letter-spacing:.1em;text-transform:uppercase;color:#8d8d90}
+.pbtn .pring{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,#ececea,#b9b9b5);color:#1c1c1c;box-shadow:0 2px 0 #6f6f72,0 4px 7px rgba(0,0,0,.7),inset 0 1px 0 #fff,0 0 0 3px #0c0c0d,0 0 0 4.5px #353638;transition:box-shadow .15s}
+.pbtn[aria-pressed=true]{color:#f4f6f8}
+.pbtn[aria-pressed=true] .pring{box-shadow:0 2px 0 #6f6f72,0 4px 7px rgba(0,0,0,.7),inset 0 1px 0 #fff,0 0 0 3px #0c0c0d,0 0 0 4.5px #fff,0 0 12px 3px rgba(255,255,255,.5)}
+.tleds{display:flex;justify-content:center;gap:16px;margin:14px 0 4px;font:800 9px var(--font);letter-spacing:.1em;color:#77777a;text-transform:uppercase}
+.tleds span{display:flex;align-items:center;gap:6px}
+.tleds i{width:6px;height:6px;border-radius:50%;background:#353638}
+.tleds .on{color:#f4f6f8}.tleds .on i{background:#ff7a2e;box-shadow:0 0 8px 1px rgba(255,122,46,.9)}
+
+/* ---------- brew ---------- */
+.brew{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:24px;flex:1}
+.stage{border-radius:22px;box-shadow:var(--inset);padding:12px;display:grid;place-items:center;min-height:300px}
+.stage svg{width:100%;max-width:300px;height:auto;display:block}
+.stage text{font-family:var(--mono)}
+.drip{stroke-dasharray:3 6;animation:drip .5s linear infinite}
+@keyframes drip{to{stroke-dashoffset:-9}}
+.live{display:flex;flex-direction:column;gap:16px;min-width:0}
+.ros{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ro{padding:9px 12px;border-radius:16px;box-shadow:var(--inset-sm);min-width:0}
+.ro .k{font-size:10.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ro .v{font:700 19px/1.25 var(--mono);letter-spacing:-.02em;white-space:nowrap}
+.ro .v small{font-size:11px;color:var(--ink-2);font-weight:500;margin-left:3px}
+.sparks{display:flex;flex-direction:column;gap:10px;flex:1;justify-content:flex-end}
+.spark{display:grid;grid-template-columns:104px 1fr;gap:12px;align-items:center}
+.spark .k{font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px}
+.spark .k i{width:10px;height:10px;border-radius:3px;flex:none}
+.spark .k small{display:block;font:500 10.5px var(--mono);color:var(--ink-2);white-space:nowrap}
+.spark svg{width:100%;height:48px;border-radius:13px;box-shadow:var(--inset-sm);display:block}
+.spark path{fill:none;stroke-width:2.2;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}
+.spark path.ghost{stroke:var(--ink-2);stroke-width:1.3;stroke-dasharray:4 4;opacity:.7}
+.spark-foot{display:flex;justify-content:space-between;font:500 11px var(--mono);color:var(--ink-2);padding-left:116px}
+
+/* ---------- result ---------- */
+.scorebox{display:flex;align-items:center;gap:18px}
+.ring{position:relative;width:112px;height:112px;flex:none;border-radius:50%;box-shadow:var(--raise-sm)}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:9}
+.ring .bgc{stroke:var(--line)}
+.ring .fg{stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .35s,stroke .35s}
+.ring .mid{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring .mid b{font:700 32px/1 var(--mono);letter-spacing:-.04em}
+.ring .mid span{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--ink-2);text-transform:uppercase;margin-top:3px}
+.verdict h3{font:700 22px/1.15 var(--display)}
+.verdict p{font-size:12.5px;color:var(--ink-2);margin-top:5px}
+.bars{display:grid;gap:11px;margin-top:20px}
+.bar-row{display:grid;grid-template-columns:82px 1fr 30px;gap:10px;align-items:center;font-size:12.5px;font-weight:700}
+.bar-row .track{position:relative;height:10px;border-radius:99px;box-shadow:var(--inset-sm)}
+.bar-row .fill{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:linear-gradient(90deg,var(--accent-2),var(--accent));transition:width .3s}
+.bar-row .ideal{position:absolute;top:-4px;width:3px;height:18px;margin-left:-1.5px;border-radius:2px;background:var(--ink);opacity:.55;transition:left .3s}
+.bar-row .n{font:700 12px var(--mono);text-align:right;color:var(--ink-2)}
+.legend{font-size:11.5px;color:var(--ink-2);margin-top:10px;display:flex;align-items:center;gap:7px}
+.legend i{width:3px;height:12px;border-radius:2px;background:var(--ink);opacity:.55}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.stats div{min-width:0}
+.stats .k{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.stats .v{font:700 14px var(--mono);white-space:nowrap}
+
+/* ---------- fixes, chart, log ---------- */
+.fixes{display:grid;gap:12px}
+.fix{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;box-shadow:var(--raise-xs)}
+.fix .gain{font:700 13px var(--mono);color:var(--good);min-width:42px}
+.fix .txt{flex:1;min-width:0;font-size:13px;font-weight:700}
+.fix .txt small{display:block;font-weight:600;font-size:11.5px;color:var(--ink-2)}
+.empty{padding:18px 16px;border-radius:16px;box-shadow:var(--inset-sm);font-size:12.5px;color:var(--ink-2)}
+.empty b{display:block;color:var(--ink);font-size:13.5px;margin-bottom:3px}
+.cc{border-radius:18px;box-shadow:var(--inset-sm);padding:6px}
+.cc svg{width:100%;height:auto;display:block}
+.cc text{font:500 9.5px var(--mono);fill:var(--ink-2)}
+.cc .axis{stroke:var(--line);stroke-width:1}
+.cc .zone{fill:var(--accent);opacity:.16}
+.cc .zone-st{fill:none;stroke:var(--accent);stroke-width:1.2;stroke-dasharray:3 3}
+.cc .old{fill:var(--ink-2);opacity:.45}
+.cc .rec{fill:none;stroke:var(--accent);stroke-width:2}
+.cc .cur{fill:var(--ink);stroke:var(--bg);stroke-width:2}
+.cc .lab{font:800 9px var(--font);letter-spacing:.1em;text-transform:uppercase;opacity:.75}
+.log{display:grid;gap:10px}
+.log.scroll{max-height:344px;overflow-y:auto;scrollbar-width:thin;margin:-6px;padding:6px}
+.log-item{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:9px 10px;border-radius:16px;box-shadow:var(--raise-xs)}
+.log-item .sc{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font:700 15px var(--mono);box-shadow:var(--inset-sm)}
+.log-item .sc[data-tone=good]{color:var(--good)}.log-item .sc[data-tone=warn]{color:var(--warn)}.log-item .sc[data-tone=bad]{color:var(--bad)}
+.log-item .t{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-item .d{font:500 11px var(--mono);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-item .acts{display:flex;gap:6px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);padding:12px 18px;border-radius:16px;background:var(--bg);box-shadow:var(--raise);font-weight:700;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:50;max-width:calc(100vw - 32px)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+[hidden]{display:none!important}
+
+/* ---------- responsive ---------- */
+@media (max-width:1120px){
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .card-hero,.span-2{grid-column:1/-1}
+  .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .panes{grid-template-columns:1fr 1fr}
+  .pane.pane-machine{grid-column:1/-1;border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:24px}
+  .seg-method{order:3;width:100%;display:flex}.seg-method button{flex:1;justify-content:center}
+}
+@media (max-width:760px){
+  .app{padding:14px 14px 28px}
+  .grid{grid-template-columns:minmax(0,1fr);gap:20px}
+  .card{padding:18px}
+  .card-h>div:not(.seg){flex:1 1 calc(100% - 50px)}
+  .card-h .sp{display:none}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .panes{grid-template-columns:1fr;gap:24px}
+  .pane+.pane{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:24px}
+  .brew{grid-template-columns:1fr}
+  .seg-method small{display:none}.seg-method button{padding:9px 8px;gap:6px}
+  .spark{grid-template-columns:84px 1fr}.spark-foot{padding-left:96px}
+  .log-item{grid-template-columns:44px 1fr}.log-item .acts{grid-column:1/-1;justify-content:flex-end}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="bar">
+    <div class="brand">
+      <span class="logo" data-icon="bean"></span>
+      <div><b>Brew Lab</b><small>Dedica Duo · K-Ultra · Ninja</small></div>
+    </div>
+    <div class="seg seg-method" id="methodSeg" role="group" aria-label="Brew method"></div>
+    <div class="tools">
+      <button class="icon-btn" id="soundBtn" data-act="sound" aria-label="Sound" title="Brew sounds"></button>
+      <button class="icon-btn" id="themeBtn" data-act="theme" aria-label="Switch light or dark theme" title="Light / dark"></button>
+    </div>
+  </header>
+
+  <main class="grid">
+
+    <!-- 01 BEANS -->
+    <section class="card" aria-labelledby="hBeans">
+      <div class="card-h">
+        <span class="step">01</span>
+        <div><h2 id="hBeans">Beans</h2><p class="sub">What is in the hopper</p></div>
+        <span class="sp"></span>
+        <span class="chip" id="freshChip">Peak window</span>
+      </div>
+      <div class="label">Roast level</div>
+      <div class="roasts" id="roasts" role="group" aria-label="Roast level"></div>
+      <p class="note" id="roastNote"></p>
+      <div class="field">
+        <div class="field-top"><label for="daysRange">Days since roast</label><output data-out="beans.days"></output></div>
+        <span class="range"><input id="daysRange" type="range" data-range="beans.days" min="1" max="45" step="1"></span>
+      </div>
+      <label class="date">Or pick the roast date <input type="date" id="roastDate"></label>
+    </section>
+
+    <!-- 02 YOUR CUP -->
+    <section class="card" aria-labelledby="hCup">
+      <div class="card-h">
+        <span class="step">02</span>
+        <div><h2 id="hCup">Your cup</h2><p class="sub">How you want it to taste</p></div>
+      </div>
+      <div class="label">Taste</div>
+      <div class="seg full" data-seg="goal.taste" role="group" aria-label="Taste">
+        <button data-val="bright">Bright</button><button data-val="balanced">Balanced</button><button data-val="bold">Bold</button>
+      </div>
+      <p class="note" id="tasteNote" style="min-height:2.9em"></p>
+      <div id="cupExtra"></div>
+    </section>
+
+    <!-- 03 PERFECT SETTINGS -->
+    <section class="card card-hero" aria-labelledby="hRec">
+      <div class="card-h">
+        <span class="step">03</span>
+        <div><h2 id="hRec">Perfect settings</h2><p class="sub" id="recSub"></p></div>
+        <span class="sp"></span>
+        <span class="chip" id="recStatus"></span>
+      </div>
+      <div class="tiles" id="recTiles"></div>
+      <div class="predict"><b id="recScore">0</b><span id="recPredText"></span></div>
+      <ul class="why" id="recWhy"></ul>
+      <button class="btn primary" data-act="dial"><span data-icon="wand"></span>Dial in for me</button>
+    </section>
+
+    <!-- 04 DIAL IT IN -->
+    <section class="card span-3" aria-labelledby="hDial">
+      <div class="card-h">
+        <span class="step">04</span>
+        <div><h2 id="hDial">Dial it in</h2><p class="sub">Change anything and the cup below updates straight away</p></div>
+        <span class="sp"></span>
+        <span class="chip" id="autoChip"></span>
+      </div>
+      <div class="panes">
+        <div class="pane">
+          <div class="pane-h"><b>Grinder</b><span id="grinderName"></span></div>
+          <div class="seg full" id="grinderSeg" role="group" aria-label="Grinder" style="margin-bottom:18px"><button data-act="grinder" data-val="kultra">K-Ultra</button><button data-act="grinder" data-val="kg89">KG89</button></div>
+          <div class="knob" id="knob" role="slider" tabindex="0" aria-label="K-Ultra grind setting" aria-valuemin="0" aria-valuemax="10">
+            <div class="knob-well"></div>
+            <svg viewBox="0 0 236 236" id="knobTicks" aria-hidden="true"></svg>
+            <div class="knob-cap"><div class="knob-rot" id="knobRot"></div></div>
+            <div class="knob-read"><b id="knobVal">3.6</b><span id="knobClicks">36 clicks</span></div>
+          </div>
+          <div class="knob-row">
+            <button class="btn sm" data-act="kminus" aria-label="One click finer">− finer</button>
+            <div class="zone"><span id="knobZone"></span><small id="knobMicron"></small></div>
+            <button class="btn sm" data-act="kplus" aria-label="One click coarser">coarser +</button>
+          </div>
+          <p class="mhelp" id="grinderNote" style="min-height:0" hidden></p>
+        </div>
+        <div class="pane">
+          <div class="pane-h"><b>Recipe</b><span id="recipeSub"></span></div>
+          <div id="recipeCtl"></div>
+        </div>
+        <div class="pane pane-machine">
+          <div class="pane-h"><b>Machine</b><span id="machineName"></span></div>
+          <div id="machinePanel"></div>
+          <p class="mhelp" id="machineHelp"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 BREW -->
+    <section class="card span-2" id="cardBrew" aria-labelledby="hBrew">
+      <i class="beam" aria-hidden="true"></i>
+      <div class="card-h">
+        <span class="step">05</span>
+        <div><h2 id="hBrew">Brew</h2><p class="sub" id="brewSub">Watch the simulation run</p></div>
+        <span class="chip" id="phaseChip">Ready</span>
+        <span class="sp"></span>
+        <div class="seg" id="speedSeg" role="group" aria-label="Simulation speed"></div>
+        <button class="btn primary" id="brewBtn" data-act="brew"><span id="brewLab" style="display:contents"></span></button>
+      </div>
+      <div class="brew">
+        <div class="stage">
+          <!-- espresso / cold stage -->
+          <svg id="stagePump" viewBox="0 0 300 290" role="img" aria-label="Espresso machine brewing into a glass">
+            <defs>
+              <linearGradient id="stl1" x1="0" x2="1"><stop offset="0" stop-color="var(--steel-2)"/><stop offset=".45" stop-color="var(--steel-1)"/><stop offset="1" stop-color="var(--steel-2)"/></linearGradient>
+              <clipPath id="clipHot"><path d="M118 196h64l-5 54a8 8 0 0 1-8 7h-38a8 8 0 0 1-8-7z"/></clipPath>
+              <clipPath id="clipCold"><path d="M112 160h76l-7 90a8 8 0 0 1-8 7h-46a8 8 0 0 1-8-7z"/></clipPath>
+            </defs>
+            <rect x="58" y="20" width="184" height="84" rx="12" fill="url(#stl1)"/>
+            <rect x="58" y="20" width="184" height="15" rx="7" fill="#1c1c1d"/>
+            <circle cx="150" cy="68" r="28" fill="#101011"/>
+            <circle cx="150" cy="68" r="28" fill="none" stroke="#8d8d8a" stroke-width="2"/>
+            <path d="M131.8 78.5A21 21 0 1 1 168.2 78.5" fill="none" stroke="#4a4a4c" stroke-width="3" stroke-linecap="round"/>
+            <path d="M152.9 47.2A21 21 0 0 1 163.5 51.9" fill="none" stroke="#5fbf8a" stroke-width="3" stroke-linecap="round"/>
+            <line id="eNeedle" x1="150" y1="68" x2="150" y2="49" stroke="#ff7a2e" stroke-width="2.2" stroke-linecap="round" transform="rotate(-120 150 68)"/>
+            <circle cx="150" cy="68" r="3" fill="#d8d8d4"/>
+            <text id="eBar" x="150" y="88" font-size="8.5" font-weight="700" fill="#e9e9e6" text-anchor="middle">0.0</text>
+            <rect x="114" y="104" width="72" height="12" fill="#161617"/>
+            <rect x="102" y="116" width="96" height="20" rx="5" fill="url(#stl1)"/>
+            <rect x="198" y="120" width="76" height="12" rx="6" fill="#161617"/>
+            <rect x="122" y="136" width="56" height="5" rx="2" fill="#8e8e8a"/>
+            <line id="eStream" x1="150" y1="141" x2="150" y2="254" stroke="#a8662e" stroke-width="3" stroke-linecap="round" opacity="0"/>
+            <g id="cupHot">
+              <g clip-path="url(#clipHot)"><rect id="eLiqHot" x="110" y="257" width="80" height="0" fill="#2a1508"/><rect id="eCremaHot" x="110" y="257" width="80" height="0" fill="#a8662e"/></g>
+              <path d="M118 196h64l-5 54a8 8 0 0 1-8 7h-38a8 8 0 0 1-8-7z" fill="var(--glass-fill)" stroke="var(--glass-st)" stroke-width="1.6"/>
+            </g>
+            <g id="cupCold" hidden>
+              <g clip-path="url(#clipCold)"><rect id="eLiqCold" x="104" y="257" width="92" height="0" fill="#3a1f0e"/></g>
+              <rect x="126" y="206" width="20" height="20" rx="4" fill="rgba(255,255,255,.35)" stroke="var(--glass-st)" transform="rotate(-12 136 216)"/>
+              <rect x="152" y="222" width="20" height="20" rx="4" fill="rgba(255,255,255,.35)" stroke="var(--glass-st)" transform="rotate(14 162 232)"/>
+              <path d="M112 160h76l-7 90a8 8 0 0 1-8 7h-46a8 8 0 0 1-8-7z" fill="var(--glass-fill)" stroke="var(--glass-st)" stroke-width="1.6"/>
+            </g>
+            <rect x="90" y="258" width="120" height="18" rx="7" fill="#161617"/>
+            <text id="eScale" x="150" y="270.5" font-size="9" font-weight="700" fill="#e9e9e6" text-anchor="middle">0.0 g</text>
+          </svg>
+          <!-- ninja stage -->
+          <svg id="stageDrip" viewBox="0 0 300 290" role="img" aria-label="Ninja drip coffee maker brewing into its carafe" hidden>
+            <defs>
+              <linearGradient id="stl2" x1="0" x2="1"><stop offset="0" stop-color="var(--steel-2)"/><stop offset=".45" stop-color="var(--steel-1)"/><stop offset="1" stop-color="var(--steel-2)"/></linearGradient>
+              <clipPath id="clipRes"><rect x="44" y="40" width="212" height="178" rx="16"/></clipPath>
+              <clipPath id="clipCar"><path d="M98 192h104v56a14 14 0 0 1-14 14h-76a14 14 0 0 1-14-14z"/></clipPath>
+              <clipPath id="clipBask"><path d="M110 156h80l-18 22h-44z"/></clipPath>
+            </defs>
+            <rect x="44" y="40" width="212" height="178" rx="16" fill="var(--glass-fill)" stroke="var(--glass-st)" stroke-width="1.5"/>
+            <g clip-path="url(#clipRes)"><rect id="nRes" x="44" y="218" width="212" height="0" fill="var(--water)"/></g>
+            <rect x="60" y="26" width="180" height="18" rx="7" fill="#1c1c1d"/>
+            <rect x="126" y="20" width="48" height="10" rx="4" fill="#111112"/>
+            <rect x="76" y="42" width="148" height="110" rx="6" fill="url(#stl2)"/>
+            <rect x="124" y="50" width="52" height="78" rx="6" fill="#0f0f10"/>
+            <text id="nClock" x="150" y="64" font-size="8" font-weight="700" fill="#f4f6f8" text-anchor="middle">10:10</text>
+            <g fill="#c9c9c5"><circle cx="138" cy="74" r="2.6"/><circle cx="150" cy="74" r="2.6"/><circle cx="162" cy="74" r="2.6"/>
+              <rect x="130" y="82" width="17" height="6" rx="3"/><rect x="153" y="82" width="17" height="6" rx="3"/>
+              <rect x="130" y="93" width="17" height="6" rx="3"/><rect x="153" y="93" width="17" height="6" rx="3"/>
+              <rect x="130" y="104" width="40" height="6" rx="3"/>
+              <rect x="130" y="115" width="17" height="6" rx="3"/><rect x="153" y="115" width="17" height="6" rx="3"/></g>
+            <circle id="nLed" cx="173" cy="107" r="1.6" fill="#353638"/>
+            <path d="M80 152h140l-9 32h-122z" fill="#161617"/>
+            <path d="M110 156h80l-18 22h-44z" fill="#2a2a2c"/>
+            <g clip-path="url(#clipBask)"><rect id="nBedWater" x="106" y="178" width="88" height="0" fill="#8a5a2b"/><rect id="nBed" x="106" y="170" width="88" height="8" fill="#3f2411"/></g>
+            <path d="M110 156h80l-18 22h-44z" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="1"/>
+            <line id="nDrip" x1="131" y1="184" x2="131" y2="258" stroke="#6b3d1a" stroke-width="2.4" stroke-linecap="round" opacity="0"/>
+            <g clip-path="url(#clipCar)"><rect id="nCoffee" x="98" y="262" width="104" height="0" fill="#2f180a"/></g>
+            <path d="M98 192h104v56a14 14 0 0 1-14 14h-76a14 14 0 0 1-14-14z" fill="var(--glass-fill)" stroke="var(--glass-st)" stroke-width="1.6"/>
+            <rect x="96.5" y="238" width="107" height="9" fill="url(#stl2)"/>
+            <rect x="139" y="196" width="22" height="62" rx="7" fill="url(#stl2)" stroke="rgba(0,0,0,.18)"/>
+            <rect x="94" y="184" width="112" height="9" rx="3" fill="#1c1c1d"/>
+            <rect id="nWarm" x="104" y="262" width="92" height="3" rx="1.5" fill="#ff7a2e" opacity="0"/>
+            <rect x="84" y="264" width="132" height="16" rx="7" fill="url(#stl2)"/>
+            <rect x="94" y="279" width="112" height="5" rx="2" fill="#161617"/>
+          </svg>
+        </div>
+        <div class="live">
+          <div class="ros" id="ros"></div>
+          <div class="sparks" id="sparks"></div>
+          <div class="spark-foot"><span>0</span><span id="sparkEnd"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 06 IN THE CUP -->
+    <section class="card" aria-labelledby="hRes">
+      <div class="card-h">
+        <span class="step">06</span>
+        <div><h2 id="hRes">In the cup</h2><p class="sub" id="resSub"></p></div>
+        <span class="sp"></span>
+        <span class="chip" id="resKind"></span>
+      </div>
+      <div class="scorebox">
+        <div class="ring"><svg viewBox="0 0 112 112"><circle class="bgc" cx="56" cy="56" r="46"/><circle class="fg" id="ringFg" cx="56" cy="56" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
+          <div class="mid"><b id="scoreVal">0</b><span>cup score</span></div></div>
+        <div class="verdict"><h3 id="verdictT"></h3><p id="verdictP"></p></div>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="legend"><i></i>ideal for these beans and your taste</div>
+      <div id="holdBox" hidden>
+        <div class="field" style="margin-top:16px">
+          <div class="field-top"><label for="holdRange" id="holdLabel">Time on the warming plate</label><output data-out="hold"></output></div>
+          <span class="range"><input id="holdRange" type="range" data-range="hold" min="0" max="240" step="5"></span>
+          <div class="field-hint" id="holdHint"></div>
+        </div>
+      </div>
+      <div class="sp"></div>
+      <div class="stats" id="stats"></div>
+    </section>
+
+    <!-- NEXT BREW -->
+    <section class="card" aria-labelledby="hFix">
+      <div class="card-h"><div><h2 id="hFix">Next brew</h2><p class="sub">Biggest wins first</p></div></div>
+      <div class="fixes" id="fixes"></div>
+    </section>
+
+    <!-- CONTROL CHART -->
+    <section class="card" aria-labelledby="hCc">
+      <div class="card-h"><div><h2 id="hCc">Brewing control chart</h2><p class="sub">Strength against extraction</p></div></div>
+      <div class="cc" id="cc"></div>
+    </section>
+
+    <!-- LOG -->
+    <section class="card" aria-labelledby="hLog">
+      <div class="card-h"><div><h2 id="hLog">Brew log</h2><p class="sub">Saved on this device</p></div><span class="sp"></span>
+        <button class="btn sm" data-act="logclear" id="logClear">Clear</button></div>
+      <div class="log" id="log"></div>
+    </section>
+
+  </main>
+  <p class="foot">Brew Lab is a simplified model, not a measurement. Use it for a starting point, then taste and adjust.</p>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script id="core">
+'use strict';
+/* ================= Brew Lab core model: pure functions, no DOM ================= */
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const r1=x=>Math.round(x*10)/10;
+
+/* Ninja DCM201 (14-cup, 70 oz reservoir, 5 oz cups, scoop = 2 tbsp) */
+const NINJA={cupMl:148,minCups:2,maxCups:14,basketMl:600,scoopG:10,cleanAt:30};
+
+const ROAST_KEYS=['light','medlight','medium','meddark','dark'];
+const ROASTS={
+  light:   {name:'Light',    col:'#c08a4d',crema:'#d9a252',sol:.90,res:.90,ey:21.0,temp:96,acid:.78,bitter:.20,body:.40,
+            note:'Dense and less soluble. Wants a finer grind, hotter water and a longer brew to round off the acidity.'},
+  medlight:{name:'Med-light',col:'#a5682f',crema:'#c98a3f',sol:.95,res:.95,ey:20.6,temp:95,acid:.65,bitter:.27,body:.47,
+            note:'Bright specialty roast with fruit sweetness. Slightly finer and hotter than a classic recipe.'},
+  medium:  {name:'Medium',   col:'#84491c',crema:'#b06f30',sol:1.0,res:1.0,ey:20.0,temp:93,acid:.50,bitter:.36,body:.55,
+            note:'Balanced solubility and a syrupy body. The classic recipe works as written.'},
+  meddark: {name:'Med-dark', col:'#5c3112',crema:'#8f5524',sol:1.06,res:1.10,ey:19.3,temp:91,acid:.37,bitter:.48,body:.64,
+            note:'Porous and quick to extract. Go a little coarser and cooler to keep the chocolate without the ash.'},
+  dark:    {name:'Dark',     col:'#3b1e0a',crema:'#70401a',sol:1.12,res:1.22,ey:18.6,temp:90,acid:.26,bitter:.60,body:.70,
+            note:'Brittle and very soluble. Coarser grind, cooler water and a shorter brew hold the bitterness down.'}
+};
+
+/* Grinders. K-Ultra: 0.1 on the dial is one click.
+   KG89: 17 click positions (counted here from the fine end), noticeable fines, and a finest position that is
+   still too coarse for an unpressurized basket. Sizes are on this model's own scale: position 1 is about K-Ultra 4.8. */
+const GRINDERS={
+  kultra:{name:'1Zpresso K-Ultra',short:'K-Ultra',min:0,max:10,step:.1,even:1,um:g=>Math.round(136+68*g),fmt:g=>g.toFixed(1)},
+  kg89:{name:"De'Longhi KG89",short:'KG89',min:1,max:17,step:1,even:.86,um:n=>Math.round(460+26.25*(n-1)),fmt:n=>String(n)}
+};
+const grinderOf=s=>GRINDERS[s&&s.grinder]||GRINDERS.kultra;
+const grindUm=s=>s.pre?680:grinderOf(s).um(s.grind);
+const microns=g=>GRINDERS.kultra.um(g);
+function zoneUm(u){
+  if(u<238)return'Turkish fine';
+  if(u<326)return'Very fine';
+  if(u<428)return'Espresso';
+  if(u<517)return'Fine: cold extraction, moka';
+  if(u<612)return'Medium-fine: pour-over';
+  if(u<734)return'Medium: drip machine';
+  return'Coarse: French press';
+}
+function nearestGrind(G,um){
+  let best=G.min,bd=1e9;
+  for(let v=G.min;v<=G.max+1e-9;v+=G.step){const d=Math.abs(G.um(v)-um);if(d<bd){bd=d;best=v;}}
+  return +best.toFixed(2);
+}
+function grindList(m,hw){
+  const G=GRINDERS[hw.grinder]||GRINDERS.kultra,a=[];
+  if(G!==GRINDERS.kultra){for(let v=G.min;v<=G.max+1e-9;v+=G.step)a.push(+v.toFixed(2));return{a,fine:[0]};}
+  const r=m==='espresso'?(hw.basket==='pressurized'?[3.4,7,.2]:[2.4,5.8,.2]):m==='cold'?[3,6.6,.2]:[6,9.9,.3];
+  for(let v=r[0];v<=r[1]+1e-9;v+=r[2])a.push(r1(v));
+  return{a,fine:m==='filter'?[-.2,-.1,0,.1,.2]:[-.1,0,.1]};
+}
+
+function fresh(days){
+  const co2=Math.exp(-days/7),stale=1-Math.exp(-Math.max(0,days-14)/24);
+  let label,tone;
+  if(days<4){label='Too fresh';tone='warn';}
+  else if(days<7){label='Still resting';tone='warn';}
+  else if(days<=21){label='Peak window';tone='good';}
+  else if(days<=35){label='Fading';tone='warn';}
+  else{label='Stale';tone='bad';}
+  return{co2,stale,label,tone,aroma:clamp(1-.32*stale-.16*Math.max(0,co2-.42),.4,1)};
+}
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* Percolation constants: concentration of what leaves the bed decays with water passed per gram of coffee */
+const C0=.2156,B=.9;      /* espresso: 20% EY at 1:2 when efficiency = 1 */
+const C0F=.0509,BF=.25;   /* drip:     ~20% EY at 60 g/L when efficiency = 1 */
+
+/* ---------- Dedica Duo: vibratory pump against the puck (hot and cold) ---------- */
+function simPump(b,s,o){
+  const R=ROASTS[b.roast],f=fresh(b.days),G=grinderOf(s),d=grindUm(s),cold=!!o.cold,rng=o.rng||null;
+  const dt=.1,tMax=cold?330:70,every=cold?5:2,nominal=o.nominal||16;
+  const press=s.basket==='pressurized';
+  const jit=rng?1+(rng()-.5)*.08:1,cj=rng?.6+.8*rng():1;
+  let R0=7.7*Math.pow(s.dose/16,1.25)*Math.pow(381/d,3.2)*R.res*(1+.22*f.co2-.18*f.stale)*jit;
+  if(press)R0=R0*.3+5.4;                              /* the dual-wall valve sets the resistance */
+  const Pcap=cold?4.5:(s.opv?9:11.5),need=4+1.05*s.dose,Qref=cold?.6:1.5;
+  const water=s.water===undefined?22:s.water;
+  const tempF=cold?.74+.007*(water-22):1+.010*(s.temp-93);
+  /* the dual-wall basket holds pressure by itself, so extraction depends far less on how fine the grind is */
+  const base=R.sol*tempF*Math.pow(381/d,press?.12:.35)*(1-.10*f.co2-.05*f.stale)*(press?.98:1)*(1-.2*(1-G.even));
+  /* channeling risk: a puck screen spreads the water, stirring (WDT) removes clumps, an uneven grind adds weak spots */
+  const lam0=.0012*(1+2*Math.max(0,(330-d)/100))*(1+1.5*f.co2)*(s.wdt?1:2.3)*(s.screen?.6:1)*(1+2.5*(1-G.even))*(1+.5*Math.pow((s.dose-nominal)/3,2))*(press?.25:1)*cj;
+  let t=0,win=0,y=0,sol=0,I=1,P=0,Q=0,peak=0,first=null;const series=[];
+  for(let i=0;;i++){
+    t=i*dt;if(t>=tMax)break;
+    const on=cold?(t<2.2||(t>=4.5&&((t-4.5)%2.8)<1.7)):(t<1.6||t>=3.6);   /* pre-infusion pulse, pause, then pump */
+    const Rt=R0*(1-.22*clamp(sol/s.dose/.22,0,1))*(.5+.5*I);
+    let tgt,tau;
+    if(win<need){win+=(on?(cold?3.4:4.6):0)*dt;tgt=on?.4+(cold?1.8:2.6)*Math.min(1,win/need):Math.max(.3,P*.7);tau=.5;Q=0;}
+    else{if(first===null)first=t;const Peq=Math.min(Pcap,15*Rt/(Rt+15/9));tgt=on?Peq:Math.min(Peq,1.15);tau=cold?.5:1.3;}
+    P+=(tgt-P)*Math.min(1,dt/tau);
+    if(first!==null){
+      Q=P/Rt;
+      const eff=clamp(base*Math.pow(clamp(Qref/Math.max(Q,.12),.35,2.5),.3)*(.72+.28*I),.3,1.4);
+      sol+=Q*dt*C0*eff*Math.exp(-B*y/s.dose);y+=Q*dt;
+      const lam=lam0*Math.pow(P/9,3);
+      if(rng){I*=1-.5*lam*dt;if(rng()<lam*dt*3.3)I*=.85;}else I*=1-lam*dt;
+      if(I<.2)I=.2;
+    }
+    if(P>peak)peak=P;
+    if(i%every===0)series.push([t,P,Q,y,sol,0]);
+    if(y>=s.yield){t+=dt;break;}
+  }
+  series.push([t,P,Q,y,sol,0]);
+  return{kind:'pump',time:t,out:y,ey:sol/s.dose*100,tds:y>1?sol/y*100:0,peak,I,first:first===null?t:first,
+    choked:y<s.yield-.5,series,groundAge:0,over:0};
+}
+
+/* ---------- Ninja DCM201: showerhead over a cone basket ---------- */
+function simDrip(b,s,o){
+  const R=ROASTS[b.roast],f=fresh(b.days),rng=o.rng||null;
+  const G=grinderOf(s),d=grindUm(s),D=s.dose,W=s.cups*NINJA.cupMl;
+  const rich=s.style==='rich',small=!!s.small,bloom=small||rich?35:20,scaled=!!o.scaled;
+  const qDel=(small?2:rich?2.4:2.9)*(scaled?.88:1);
+  const Tb=94-4.5*Math.exp(-W/450)+(small?1.6:0)-(scaled?1.5:0);
+  const jit=rng?1+(rng()-.5)*.1:1,paper=s.filter!=='mesh';
+  const tau=40*Math.pow(680/d,3)*Math.pow(D/60,.55)*(paper?1:.72)*(1+.25*f.co2*.5)*jit;
+  const absorb=2*D,cap=Math.max(60,NINJA.basketMl-2.4*D);
+  const groundAge=(s.pre?.10:0)+.09*(1-Math.exp(-(s.delay||0)/6));
+  const Fbed=1-(small?.05:.13)*Math.exp(-D/20)-.03*Math.max(0,(D-110)/20);
+  const eff=clamp((1+(R.sol-1)*.4)*(1+.012*(Tb-93))*Math.pow(680/d,.35)*Math.pow(clamp(tau/40,.3,4),.14)*(1-.08*f.co2*(bloom>20?.35:.6)-.05*f.stale)
+    *Fbed*Math.pow(2.9/qDel,.18)*(paper?1:1.02)*(s.pre?1:1-.2*(1-G.even))*(rng?1+(rng()-.5)*.03:1),.35,1.35);
+  const dt=1;let t=0,del=0,V=0,abs=0,out=0,sol=0,over=0,peak=0,bEnd=null;const series=[];
+  for(let i=0;i<3000;i++){
+    t=i*dt;let qin=0;
+    if(del<W-.01){
+      if(bEnd===null&&del>=Math.min(W,1.6*D))bEnd=t+bloom;
+      const paused=bEnd!==null&&t<bEnd;
+      qin=paused?0:Math.min(qDel*((t%8)<6?1.3333:0),(W-del)/dt);     /* the heater delivers in pulses */
+    }
+    del+=qin*dt;
+    let free=qin*dt;const a=Math.min(free,absorb-abs);abs+=a;free-=a;V+=free;
+    if(V>cap){over+=V-cap;V=cap;}
+    const qo=V/tau;V-=qo*dt;
+    sol+=qo*dt*C0F*eff*Math.exp(-BF*out/D);out+=qo*dt;
+    if(V>peak)peak=V;
+    if(i%2===0)series.push([t,V,qo,out,sol,del]);
+    if(del>=W-.01&&V<4){t+=dt;break;}
+  }
+  series.push([t,V,0,out,sol,del]);
+  const bev=out*.99;
+  return{kind:'drip',time:t,out:bev,ey:sol/D*100,tds:bev>1?sol/bev*100:0,peak,cap,over,I:1,Tb,W,series,groundAge,choked:false,bloomEnd:bEnd};
+}
+
+function simulate(m,b,g,s,o){
+  o=o||{};
+  if(m==='filter')return simDrip(b,s,o);
+  return simPump(b,s,{rng:o.rng,cold:m==='cold',nominal:m==='espresso'&&g.shot==='single'?9.5:16});
+}
+
+/* ---------- what "perfect" means for these beans and this drinker ---------- */
+function targets(m,b,g){
+  const R=ROASTS[b.roast],dE=g.taste==='bright'?-.6:g.taste==='bold'?.5:0;
+  if(m==='espresso'){
+    let tds=(g.taste==='bright'?8.6:g.taste==='bold'?10.6:9.6)+(20-R.ey)*.45;if(g.espServe==='milk')tds+=.7;
+    const single=g.shot==='single';
+    return{ey:R.ey+dE,tds,wE:6,wT:4.5,tLo:single?15:23,tHi:(single?27:32)+(b.roast==='light'?3:0),temp:R.temp,yLo:5,yHi:14.5};
+  }
+  if(m==='cold'){
+    const long=g.coldSize==='brew';
+    let tds=(long?2.3:5.7)*(g.taste==='bright'?.92:g.taste==='bold'?1.1:1);if(g.coldServe==='ice')tds*=1.12;
+    return{ey:(long?15.8:14.2)+.3*(R.ey-20)+dE,tds,wE:6,wT:long?45:6,tLo:long?110:40,tHi:long?270:90,yLo:long?1:3,yHi:long?3.8:9};
+  }
+  let tds=g.taste==='bright'?1.22:g.taste==='bold'?1.40:1.31;if(g.serve==='milk')tds+=.10;if(g.serve==='ice')tds+=.22;
+  return{ey:20+(R.ey-20)*.5+dE,tds,wE:6,wT:330,yLo:.7,yHi:2};
+}
+
+function evaluate(m,b,g,s,res,x){
+  x=x||{};
+  const T=targets(m,b,g),R=ROASTS[b.roast],f=fresh(b.days);
+  const dE=res.ey-T.ey,dS=res.tds-T.tds,str=res.tds/T.tds,hold=x.hold||0;
+  const aroma=clamp(f.aroma-(res.groundAge||0),.35,1);
+  const uneven=s.pre?0:1-grinderOf(s).even;       /* a wide particle spread extracts sour and bitter at once */
+  let raw=100-T.wE*dE*dE-T.wT*dS*dS-(1-aroma)*45-uneven*40;
+  if(res.kind==='pump'){
+    const k=m==='cold'?.25:1.2;
+    if(res.time<T.tLo)raw-=Math.min(18,(T.tLo-res.time)*k);
+    if(res.time>T.tHi)raw-=Math.min(18,(res.time-T.tHi)*k);
+    raw-=(1-res.I)*55;
+    if(m==='espresso')raw-=.5*Math.pow(s.temp-T.temp,2);
+    if(s.basket==='pressurized')raw-=6;
+    if(res.choked)raw-=35;
+  }else{
+    if(res.over>5)raw-=30;
+    const wantRich=g.taste==='bold'||g.serve!=='black';
+    if((s.style==='rich')!==wantRich)raw-=(g.taste==='balanced'&&g.serve==='black')?1:3;
+    raw-=s.warm?Math.min(40,.2*hold):Math.min(30,.3*Math.max(0,hold-10));
+  }
+  const score=clamp(Math.round(raw),0,100);
+
+  const xe=clamp(dE/2.5,-1.6,1.6),ov=Math.max(0,xe),un=Math.max(0,-xe);
+  let acid=R.acid+.24*un-.12*ov,bitter=R.bitter+.30*ov-.07*un+(1-res.I)*.25,
+      sweet=(.88-.34*xe*xe)*aroma*(.8+.2*res.I),body=.5*R.body+.45*str;
+  if(m==='espresso'){acid+=.012*(T.temp-s.temp);bitter+=.015*(s.temp-T.temp);body+=.05;}
+  if(m==='cold'){acid*=.62;bitter*=.72;sweet+=.04;}
+  if(m==='filter'){
+    if(s.style==='rich'){body+=.05;bitter+=.03;acid-=.03;}
+    if(s.filter==='mesh')body+=.07;
+    if(s.warm){bitter+=.0018*hold;sweet-=.0014*hold;acid+=.0006*hold;}else{sweet-=.0008*hold;acid+=.0004*hold;}
+  }
+  sweet-=uneven*.5;bitter+=uneven*.35;acid+=uneven*.2;
+  const taste={acid:clamp(acid,.03,1),sweet:clamp(sweet,.03,1),body:clamp(body,.03,1),bitter:clamp(bitter,.03,1)};
+
+  let title,text;
+  const e=dE<-1.1?'under':dE>1.1?'over':'ok',st=str<.9?'weak':str>1.1?'strong':'ok';
+  if(res.choked){title='Choked';text='The grind is so fine the pump cannot push water through. Go coarser by several clicks.';}
+  else if(res.over>5){title='Basket overflow';text='Water backed up over the filter and carried grounds into the carafe. Grind coarser or use less coffee.';}
+  else if(res.I<.78){title='Channeled';text='Water broke through weak spots in the puck, so the cup is sour and bitter at once. Stir the grounds, and check dose and grind.';}
+  else if(m==='filter'&&hold>=45&&s.warm){title='Stewed on the plate';text='It brewed well, but the warming plate has cooked it. Pour within half an hour or move it to a flask.';}
+  else if(e==='ok'&&st==='ok'){
+    if(score>=88){title='Dialed in';text='Sweet, balanced and right on strength. This is the cup these beans can give.';}
+    else if(aroma<.9){title='Good brew, tired beans';text='Extraction and strength are on target. The beans themselves are holding the cup back.';}
+    else{title='Very close';text='Extraction and strength are in range. Small details separate this from perfect.';}
+  }
+  else if(e==='under'&&st==='weak'){title='Sour and watery';text='Under-extracted and thin. Grind finer first, then use a little more coffee.';}
+  else if(e==='under'&&st==='strong'){title='Sour but intense';text='Plenty of strength, not enough extraction. Let more water through or grind finer.';}
+  else if(e==='under'){title='Sour edge';text='Under-extracted: sharp acidity and a short finish. Grind finer or brew hotter.';}
+  else if(e==='over'&&st==='weak'){title='Bitter and thin';text='Too much water through too little coffee. Use more coffee or stop earlier.';}
+  else if(e==='over'&&st==='strong'){title='Harsh and heavy';text='Over-extracted and strong. Grind coarser and ease off the dose.';}
+  else if(e==='over'){title='Bitter finish';text='Over-extracted: dry, lingering bitterness. Grind coarser or brew cooler.';}
+  else if(st==='weak'){title='Balanced but weak';text='The flavor is right, there is just not enough of it. Use more coffee for the same water.';}
+  else{title='Balanced but strong';text='The flavor is right but concentrated. Use a little less coffee or more water.';}
+  return{raw,score,taste,title,text,tone:score>=85?'good':score>=65?'warn':'bad',T,dE,str,aroma};
+}
+
+/* ---------- search the model for the best settings ---------- */
+function recommend(m,b,g,hw,o){
+  let best=null;
+  const tryS=s=>{const r=simulate(m,b,g,s,o),e=evaluate(m,b,g,s,r);if(!best||e.raw>best.e.raw)best={s:Object.assign({},s),r,e};};
+  if(m==='espresso'){
+    const dose=g.shot==='single'?9.5:16,GL=grindList(m,hw),base=Object.assign({},hw,{dose,wdt:true,screen:true});
+    const temps=[90,93,96].filter(t=>Math.abs(t-ROASTS[b.roast].temp)<=4);
+    for(const gr of GL.a)for(let ra=1.4;ra<=3.01;ra+=.2)for(const temp of temps)
+      tryS(Object.assign({},base,{grind:gr,yield:Math.round(dose*ra),temp}));
+    const c=best.s;
+    for(const dg of GL.fine)for(const dy of[-2,-1,0,1,2])tryS(Object.assign({},c,{grind:r1(c.grind+dg),yield:c.yield+dy}));
+  }else if(m==='cold'){
+    const long=g.coldSize==='brew',GL=grindList(m,hw),base=Object.assign({},hw,{dose:16,wdt:true,screen:true});
+    const ys=long?[80,90,100,110,120,130,140]:[30,35,40,45,50,55];
+    for(const gr of GL.a)for(const y of ys)tryS(Object.assign({},base,{grind:gr,yield:y}));
+    const c=best.s;
+    for(const dg of GL.fine)for(const dy of[-5,0,5])tryS(Object.assign({},c,{grind:r1(c.grind+dg),yield:c.yield+dy}));
+  }else{
+    const cups=g.cups,W=cups*NINJA.cupMl,GL=grindList(m,hw),base=Object.assign({},hw,{cups,small:cups<=4,delay:0});
+    const grs=hw.pre?[nearestGrind(GRINDERS[hw.grinder]||GRINDERS.kultra,680)]:GL.a;
+    for(const gr of grs)for(let gl=44;gl<=76;gl+=4)for(const style of['classic','rich'])
+      tryS(Object.assign({},base,{grind:gr,dose:Math.round(W*gl/1000),style}));
+    const c=best.s;
+    for(const dg of(hw.pre?[0]:GL.fine))for(const dd of[-3,-2,-1,0,1,2,3])tryS(Object.assign({},c,{grind:r1(c.grind+dg),dose:Math.max(8,c.dose+dd)}));
+  }
+  return best;
+}
+
+const TUNE={espresso:['grind','yield','temp','dose','wdt','screen'],cold:['grind','yield','dose','wdt','screen'],filter:['grind','dose','cups','style','small','delay']};
+function diffKeys(m,s,rec){return TUNE[m].filter(k=>!(m==='filter'&&k==='grind'&&s.pre)&&s[k]!==rec.s[k]);}
+function fixes(m,b,g,s,rec,x,o){
+  const cur=evaluate(m,b,g,s,simulate(m,b,g,s,o),x).raw,list=[];
+  for(const k of diffKeys(m,s,rec)){
+    const s2=Object.assign({},s,{[k]:rec.s[k]}),e=evaluate(m,b,g,s2,simulate(m,b,g,s2,o),x).raw;
+    list.push({k,from:s[k],to:rec.s[k],gain:e-cur});
+  }
+  list.sort((p,q)=>q.gain-p.gain);
+  const all=Object.assign({},s);TUNE[m].forEach(k=>{all[k]=rec.s[k];});
+  return{list,cur,total:evaluate(m,b,g,all,simulate(m,b,g,all,o),x).raw-cur};
+}
+if(typeof module!=='undefined')module.exports={ROASTS,ROAST_KEYS,NINJA,GRINDERS,grinderOf,grindUm,microns,fresh,simulate,evaluate,recommend,fixes,targets,mulberry32};
+</script>
+<script id="ui">
+(function(){
+'use strict';
+/* ================= Brew Lab interface ================= */
+const $=(s,r)=>(r||document).querySelector(s),$$=(s,r)=>Array.from((r||document).querySelectorAll(s));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hide=(el,on)=>{if(el)el.toggleAttribute('hidden',!!on);};
+const setA=(sel,o)=>{const e=$(sel);for(const k in o)e.setAttribute(k,o[k]);};
+const parse=v=>v==='true'?true:v==='false'?false:(v!==''&&!isNaN(v)?+v:v);
+const LS='brewlab.v1';
+const ICON={
+  bean:'<ellipse cx="12" cy="12" rx="6.6" ry="9.4" transform="rotate(28 12 12)"/><path d="M8.4 4.8c4.6 3.2.6 9 7.2 14.4"/>',
+  flame:'<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  snow:'<path d="M12 2v20M3.3 7l17.4 10M20.7 7 3.3 17M9 4l3 3 3-3M9 20l3-3 3 3"/>',
+  drip:'<path d="M5 4h14l-5.2 7.5V14h-3.6v-2.5z"/><path d="M8 17h8v2a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>',
+  moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>',
+  vol:'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>',
+  mute:'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>',
+  play:'<path d="M7 4v16l13-8z" fill="currentColor"/>',
+  stop:'<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
+  wand:'<path d="m12 3 1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/><path d="M19 16v4M17 18h4"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  cup1:'<path d="M6 9h10v5a4 4 0 0 1-4 4h-2a4 4 0 0 1-4-4z"/><path d="M16 10.5h1.2a2 2 0 0 1 0 4H16M5 21h12"/>',
+  cup2:'<path d="M2.5 10H10v4a3 3 0 0 1-3 3H5.5a3 3 0 0 1-3-3zM13 10h7.5v4a3 3 0 0 1-3 3H16a3 3 0 0 1-3-3zM3 21h17"/>'
+};
+const ic=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
+
+const METHODS={
+  espresso:{name:'Espresso',sub:'Dedica Duo, hot',icon:'flame',machine:"De'Longhi Dedica Duo",speeds:[1,2,4],verb:'Pull shot'},
+  cold:{name:'Cold extraction',sub:'Dedica Duo, cold',icon:'snow',machine:"De'Longhi Dedica Duo",speeds:[2,4,8],verb:'Brew cold'},
+  filter:{name:'Filter',sub:'Ninja 14-cup drip',icon:'drip',machine:'Ninja DCM201',speeds:[8,16,32],verb:'Brew'}
+};
+const HW={espresso:['basket','opv','grinder'],cold:['basket','water','grinder'],filter:['filter','pre','warm','grinder']};
+const DEF={v:1,method:'espresso',sound:false,
+  beans:{roast:'medium',days:10,date:''},
+  goal:{taste:'balanced',shot:'double',espServe:'straight',coldSize:'brew',coldServe:'ice',cups:8,serve:'black'},
+  set:{espresso:{grind:3.6,dose:16,yield:34,temp:93,basket:'open',wdt:true,screen:true,opv:false,grinder:'kultra'},
+       cold:{grind:4.4,dose:16,yield:100,water:22,basket:'open',wdt:true,screen:true,grinder:'kultra'},
+       filter:{grind:8.1,dose:68,cups:8,style:'classic',small:false,filter:'paper',pre:false,delay:0,warm:true,grinder:'kultra'}},
+  auto:{espresso:true,cold:true,filter:true},speed:{espresso:2,cold:4,filter:16},
+  hold:0,cleans:0,log:[],ghost:null};
+
+function merge(a,b){for(const k in a){if(b==null||b[k]===undefined)continue;if(a[k]&&typeof a[k]==='object'&&!Array.isArray(a[k]))merge(a[k],b[k]);else a[k]=b[k];}return a;}
+const isoLocal=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function daysFrom(iso){const n=Math.round((Date.now()-new Date(iso+'T12:00:00').getTime())/864e5);return isFinite(n)?clamp(n,1,45):null;}
+function load(){
+  const d=JSON.parse(JSON.stringify(DEF));
+  try{const j=JSON.parse(localStorage.getItem(LS));if(j&&j.v===1)merge(d,j);}catch(e){}
+  if(!METHODS[d.method])d.method='espresso';
+  if(!ROASTS[d.beans.roast])d.beans.roast='medium';
+  if(d.beans.date){const n=daysFrom(d.beans.date);if(n)d.beans.days=n;}
+  if(!Array.isArray(d.log))d.log=[];
+  for(const k in d.set){const s=d.set[k];if(!GRINDERS[s.grinder])s.grinder='kultra';const G=GRINDERS[s.grinder];s.grind=clamp(+s.grind||G.min,G.min,G.max);}
+  return d;
+}
+function save(){try{localStorage.setItem(LS,JSON.stringify(S));}catch(e){}}
+
+let S=load(),cur=null,view=null,brewing=false,run=null,raf=0,rq=0,lcdMode='clock',helpMsg='',sparkT=1,builtFor=null,knobFor=null;
+const recCache=new Map();
+
+/* ---------- state helpers ---------- */
+function getPath(p){if(p==='hold')return S.hold;const i=p.indexOf('.'),a=p.slice(0,i),k=p.slice(i+1);return a==='set'?S.set[S.method][k]:S[a][k];}
+function setPath(p,v){
+  if(p==='hold'){S.hold=v;return;}
+  cancelBrew();
+  const i=p.indexOf('.'),a=p.slice(0,i),k=p.slice(i+1);
+  if(a==='set'){S.set[S.method][k]=v;if(!HW[S.method].includes(k))S.auto[S.method]=false;}else S[a][k]=v;
+  if(p==='beans.days')S.beans.date=isoLocal(new Date(Date.now()-v*864e5));
+}
+const simO=()=>({scaled:S.method==='filter'&&S.cleans>=NINJA.cleanAt});
+const hwOf=m=>{const o={};HW[m].forEach(k=>{o[k]=S.set[m][k];});return o;};
+const stamp=()=>JSON.stringify([S.method,S.beans.roast,S.beans.days,S.goal,S.set[S.method],simO()]);
+function getRec(){
+  const m=S.method,key=JSON.stringify([m,S.beans.roast,S.beans.days,S.goal,hwOf(m),simO()]);
+  let r=recCache.get(key);
+  if(!r){r=recommend(m,S.beans,S.goal,hwOf(m),simO());if(recCache.size>80)recCache.clear();recCache.set(key,r);}
+  return r;
+}
+function compute(){
+  const m=S.method,rec=getRec();
+  if(S.auto[m])Object.assign(S.set[m],rec.s);
+  const s=S.set[m],x={hold:m==='filter'?S.hold:0},res=simulate(m,S.beans,S.goal,s,simO()),st=stamp();
+  cur={rec,res,s,ev:evaluate(m,S.beans,S.goal,s,res,x),fix:fixes(m,S.beans,S.goal,s,rec,x,simO())};
+  if(!(view&&view.kind==='brewed'&&view.stamp===st))view={kind:'predicted',res,stamp:st,m,beans:S.beans,goal:S.goal,s};
+  view.ev=evaluate(view.m,view.beans,view.goal,view.s,view.res,x);
+}
+function refresh(){if(rq)return;rq=requestAnimationFrame(()=>{rq=0;compute();render();save();});}
+
+/* ---------- formatting ---------- */
+const tName=t=>({90:'Low',93:'Med',96:'High'}[t]||t+'°');
+const mmss=t=>{t=Math.round(t);return Math.floor(t/60)+':'+String(t%60).padStart(2,'0');};
+const gpl=s=>Math.round(s.dose/(s.cups*NINJA.cupMl/1000));
+function fmtOut(p){
+  const v=getPath(p),m=S.method;
+  switch(p){
+    case'beans.days':return v+(v===1?' day':' days');
+    case'goal.cups':return v+' cups';
+    case'set.dose':return m==='filter'?v+' g':v.toFixed(1)+' g';
+    case'set.yield':return v+' g';
+    case'set.water':return v+' °C';
+    case'set.cups':return v+'-cup line';
+    case'hold':return v<60?v+' min':Math.floor(v/60)+' h '+String(v%60).padStart(2,'0');
+  }
+  return String(v);
+}
+function hintFor(p){
+  const m=S.method,s=S.set[m];
+  switch(p){
+    case'goal.cups':return(S.goal.cups*NINJA.cupMl/1000).toFixed(2)+' L, about '+Math.max(1,Math.round(S.goal.cups*NINJA.cupMl/300))+' mugs';
+    case'set.dose':return m==='filter'?'about '+(s.dose/NINJA.scoopG).toFixed(1)+' Ninja scoops, '+gpl(s)+' g per litre':(S.goal.shot==='single'&&m==='espresso'?'single basket holds 8 to 11 g':'double basket holds 14 to 18 g');
+    case'set.yield':return'ratio 1:'+(s.yield/s.dose).toFixed(1);
+    case'set.water':return s.water<=10?'Fridge cold: clean, but extracts less':s.water<=24?'Room temperature tank water':'Warm tank water extracts more';
+    case'set.cups':return(s.cups*NINJA.cupMl/1000).toFixed(2)+' L. The machine brews all of it';
+  }
+  return'';
+}
+
+/* ---------- static build ---------- */
+function beanSVG(col){return`<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="7.2" ry="10" transform="rotate(28 12 12)" fill="${col}"/><path d="M8.2 4.6c5 3.2.6 9.4 7.6 14.8" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="1.6" stroke-linecap="round"/><path d="M6.6 8.2c.8-1.9 2-3.1 3.4-3.7" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.2" stroke-linecap="round"/></svg>`;}
+function buildStatic(){
+  $$('[data-icon]').forEach(e=>{e.innerHTML=ic(e.dataset.icon);});
+  $('#methodSeg').innerHTML=Object.keys(METHODS).map(k=>`<button data-act="method" data-val="${k}">${ic(METHODS[k].icon)}<span><b>${METHODS[k].name}</b><small>${METHODS[k].sub}</small></span></button>`).join('');
+  $('#roasts').innerHTML=ROAST_KEYS.map(k=>`<button class="roast" data-act="roast" data-val="${k}"><span class="bean">${beanSVG(ROASTS[k].col)}</span>${ROASTS[k].name}</button>`).join('');
+  $('#bars').innerHTML=[['acid','Acidity'],['sweet','Sweetness'],['body','Body'],['bitter','Bitterness']].map(b=>`<div class="bar-row"><span>${b[1]}</span><div class="track"><div class="fill" id="bf_${b[0]}"></div><i class="ideal" id="bi_${b[0]}"></i></div><span class="n" id="bn_${b[0]}"></span></div>`).join('');
+}
+/* dial face for the selected grinder: the K-Ultra shows every half number, a stepped grinder shows every position */
+function buildKnob(G){
+  const n=Math.round((G.max-G.min)/G.step),fineDial=G===GRINDERS.kultra,every=fineDial?5:1,lab=fineDial?10:1;let t='';
+  for(let i=0;i<=n;i+=every){
+    const a=(-150+300*i/n)*Math.PI/180,maj=i%lab===0,ra=maj?97:100,sx=Math.sin(a),cx=Math.cos(a);
+    t+=`<line class="${maj?'maj':''}" x1="${(118+ra*sx).toFixed(1)}" y1="${(118-ra*cx).toFixed(1)}" x2="${(118+108*sx).toFixed(1)}" y2="${(118-108*cx).toFixed(1)}"/>`;
+    if(maj)t+=`<text x="${(118+86*sx).toFixed(1)}" y="${(118-86*cx).toFixed(1)}">${+(G.min+i*G.step).toFixed(1)}</text>`;
+  }
+  $('#knobTicks').innerHTML=t+'<circle class="recdot" id="knobRec" r="4.5" cx="118" cy="5"/>';
+}
+function seg(path,opts,label){return`<div class="seg full" data-seg="${path}" role="group" aria-label="${label}">${opts.map(o=>`<button data-val="${o[0]}">${o[1]}</button>`).join('')}</div>`;}
+function range(path,label,min,max,step){const id='r_'+path.replace('.','_');return`<div class="field"><div class="field-top"><label for="${id}">${label}</label><output data-out="${path}"></output></div><span class="range"><input id="${id}" type="range" data-range="${path}" min="${min}" max="${max}" step="${step}"><i class="rec" hidden></i></span><div class="field-hint" data-hint="${path}"></div></div>`;}
+function tog(path,label,sub){return`<button class="tog" data-toggle="${path}"><span>${label}<small>${sub}</small></span><i></i></button>`;}
+function ninjaPanel(){return`<div class="machine"><div class="glass">
+  <div class="lcd" id="lcd"></div>
+  <div class="mrounds"><button class="mround" data-act="dh" aria-label="Delay hour">H</button><button class="mround" data-act="dm" aria-label="Delay minute">M</button><button class="mround" data-act="fresh" aria-label="Freshness timer">${ic('clock')}</button></div>
+  <div class="mrow">
+    <button class="mbtn" id="mDelay" data-act="delay">DELAY<span class="led l"></span></button>
+    <button class="mbtn" id="mSmall" data-act="small">1-4 CUP<span class="led r"></span></button>
+    <button class="mbtn" id="mClassic" data-act="style" data-val="classic">CLASSIC<span class="led l"></span></button>
+    <button class="mbtn" id="mRich" data-act="style" data-val="rich">RICH<span class="led r"></span></button>
+    <button class="mbtn wide" id="mBrew" data-act="brew">BREW / OFF<span class="led r"></span></button>
+    <button class="mbtn" id="mClean" data-act="clean">CLEAN<span class="led l"></span></button>
+    <button class="mbtn" id="mWarm" data-act="warm">WARM<span class="led r warm"></span></button>
+  </div></div><div class="mname">Ninja</div></div>`;}
+function dedicaPanel(){return`<div class="machine"><div class="glass">
+  <div class="progs">
+    <button class="pbtn" data-act="prog" data-val="single"><span class="pring">${ic('cup1')}</span>1 cup</button>
+    <button class="pbtn" data-act="prog" data-val="double"><span class="pring">${ic('cup2')}</span>2 cups</button>
+    <button class="pbtn" data-act="prog" data-val="cold"><span class="pring">${ic('snow')}</span>Cold</button>
+  </div>
+  <div class="tleds" id="tleds"></div>
+  <div class="mrow"><button class="mbtn wide" id="mBrew" data-act="brew">BREW<span class="led r"></span></button></div>
+  </div><div class="mname">De'Longhi</div></div>`;}
+function buildBrewUI(){
+  const pump=S.method!=='filter';
+  const ro=pump?['Time','Pressure','Flow','In the cup','Extraction','Strength']:['Time','Brew temp','Drip rate','In the carafe','Extraction','Strength'];
+  $('#ros').innerHTML=ro.map((k,i)=>`<div class="ro"><div class="k">${k}</div><div class="v" id="ro${'TABCES'[i]}">0</div></div>`).join('');
+  const sp=pump?['Pressure','Flow','In cup']:['Basket','Drip rate','Carafe'];
+  $('#sparks').innerHTML=sp.map((k,i)=>`<div class="spark"><div class="k"><i style="background:var(--c-${'abc'[i]})"></i><span>${k}<small id="spMax${i}"></small></span></div><svg viewBox="0 0 300 48" preserveAspectRatio="none" aria-hidden="true"><defs><clipPath id="spClip${i}"><rect id="spRect${i}" x="0" y="0" width="300" height="48"/></clipPath></defs><path class="ghost" id="spGhost${i}" d=""/><path id="spPath${i}" d="" style="stroke:var(--c-${'abc'[i]})" clip-path="url(#spClip${i})"/></svg></div>`).join('');
+}
+function buildMethodUI(){
+  const m=S.method;let cup,ctl;
+  const basket=`<div class="label">Basket</div>${seg('set.basket',[['open','Unpressurized'],['pressurized','Pressurized']],'Basket')}`;
+  if(m==='espresso'){
+    cup=`<div class="label">Shot</div>${seg('goal.shot',[['single','Single'],['double','Double']],'Shot size')}<div class="label">Drink it</div>${seg('goal.espServe',[['straight','Straight'],['milk','With milk']],'Serving')}`;
+    ctl=range('set.dose','Dose',7,20,.5)+range('set.yield','Yield in the cup',10,70,1)+`<div class="label">Water temperature</div>${seg('set.temp',[[90,'Low 90°'],[93,'Med 93°'],[96,'High 96°']],'Water temperature')}${basket}<div class="togs">${tog('set.wdt','Stir grounds','WDT needle tool')}${tog('set.screen','Puck screen','On top of the puck')}${tog('set.opv','9-bar mod','OPV spring swap')}</div>`;
+  }else if(m==='cold'){
+    cup=`<div class="label">Recipe</div>${seg('goal.coldSize',[['shot','Cold espresso'],['brew','Cold brew']],'Cold recipe')}<div class="label">Drink it</div>${seg('goal.coldServe',[['straight','Straight'],['ice','Over ice']],'Serving')}`;
+    ctl=range('set.dose','Dose',10,20,.5)+range('set.yield','Yield in the glass',25,160,5)+range('set.water','Tank water',4,30,1)+basket+`<div class="togs">${tog('set.wdt','Stir grounds','WDT needle tool')}${tog('set.screen','Puck screen','On top of the puck')}</div>`;
+  }else{
+    cup=range('goal.cups','How much coffee',NINJA.minCups,NINJA.maxCups,1)+`<div class="label">Drink it</div>${seg('goal.serve',[['black','Black'],['milk','With milk'],['ice','Over ice']],'Serving')}`;
+    ctl=range('set.cups','Water in the reservoir',NINJA.minCups,NINJA.maxCups,1)+range('set.dose','Ground coffee',8,170,1)+`<div class="label">Filter</div>${seg('set.filter',[['paper','Paper #4 cone'],['mesh','Permanent mesh']],'Filter type')}<div class="togs">${tog('set.pre','Pre-ground','Shop-ground, medium')}</div>`;
+  }
+  $('#cupExtra').innerHTML=cup;$('#recipeCtl').innerHTML=ctl;
+  $('#machinePanel').innerHTML=m==='filter'?ninjaPanel():dedicaPanel();
+  $('#machineName').textContent=METHODS[m].machine;
+  $('#speedSeg').innerHTML=METHODS[m].speeds.map(v=>`<button data-act="speed" data-val="${v}">${v}×</button>`).join('');
+  hide($('#stagePump'),m==='filter');hide($('#stageDrip'),m!=='filter');
+  hide($('#cupHot'),m!=='espresso');hide($('#cupCold'),m!=='cold');
+  hide($('#holdBox'),m!=='filter');
+  buildBrewUI();helpMsg='';lcdMode='clock';
+}
+
+/* ---------- 7-segment clock ---------- */
+const SEG={0:'abcdef',1:'bc',2:'abged',3:'abgcd',4:'fgbc',5:'afgcd',6:'afgedc',7:'abc',8:'abcdefg',9:'abcdfg'};
+const SEGP={a:'3,0 15,0 12,4 6,4',b:'18,2 18,17 14,15 14,5',c:'18,21 18,36 14,33 14,23',d:'3,38 15,38 12,34 6,34',e:'0,21 0,36 4,33 4,23',f:'0,2 0,17 4,15 4,5',g:'3,19 6,17 12,17 15,19 12,21 6,21'};
+function seg7(str){
+  let x=0,o='';
+  for(const ch of str){
+    if(ch===':'){o+=`<circle class="seg-on" cx="${x+2}" cy="12" r="2.2"/><circle class="seg-on" cx="${x+2}" cy="27" r="2.2"/>`;x+=10;continue;}
+    const on=SEG[ch]||'';
+    for(const k in SEGP)o+=`<polygon class="${on.indexOf(k)>=0?'seg-on':'seg-off'}" points="${SEGP[k].split(' ').map(p=>{const q=p.split(',');return(+q[0]+x)+','+q[1];}).join(' ')}"/>`;
+    x+=24;
+  }
+  return`<svg viewBox="0 0 ${x-6} 38" aria-hidden="true">${o}</svg>`;
+}
+function renderLCD(){
+  const el=$('#lcd');if(!el)return;
+  const s=S.set.filter;let txt,am=false,pm=false,mode='';
+  if(brewing&&run){const t=Math.floor(run.t);txt=String(Math.floor(t/60)).padStart(2,' ')+':'+String(t%60).padStart(2,'0');mode='BREW';}
+  else if(lcdMode==='fresh'){txt=String(Math.floor(S.hold/60)).padStart(2,' ')+':'+String(S.hold%60).padStart(2,'0');mode='FRESH';}
+  else{
+    let d=new Date();if(s.delay>0){d=new Date(d.getTime()+s.delay*36e5);mode='DELAY';}
+    let h=d.getHours();pm=h>=12;am=!pm;h=h%12||12;txt=String(h).padStart(2,' ')+':'+String(d.getMinutes()).padStart(2,'0');
+  }
+  el.innerHTML=seg7(txt)+`<div class="ann"><span class="${am?'on':''}">AM</span><span class="${pm?'on':''}">PM</span><span class="${mode?'on':''}">${mode||'DELAY'}</span></div>`;
+  $('#nClock').textContent=txt.trim();
+}
+
+/* ---------- renderers ---------- */
+function renderTop(){
+  const m=S.method;
+  $$('#methodSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.val===m));
+  const sb=$('#soundBtn');sb.innerHTML=ic(S.sound?'vol':'mute');sb.setAttribute('aria-pressed',S.sound);
+  $('#themeBtn').innerHTML=ic(document.documentElement.dataset.theme==='dark'?'sun':'moon');
+  $$('#speedSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.val===S.speed[m]));
+  $('#brewLab').innerHTML=brewing?ic('stop')+'Stop':ic('play')+METHODS[m].verb;
+}
+function renderBeans(){
+  const f=fresh(S.beans.days),c=$('#freshChip'),d=$('#roastDate');
+  $$('#roasts .roast').forEach(b=>b.setAttribute('aria-pressed',b.dataset.val===S.beans.roast));
+  $('#roastNote').textContent=ROASTS[S.beans.roast].note;
+  c.textContent=f.label;c.dataset.tone=f.tone;
+  if(document.activeElement!==d)d.value=S.beans.date||'';
+  d.max=isoLocal(new Date());
+  $('#tasteNote').textContent={bright:'Lighter and livelier: a touch less extraction and strength, so fruit and acidity lead.',balanced:'The middle of the target: sweetness first, with acidity and bitterness in check.',bold:'Fuller and stronger: a little more extraction and concentration for a heavier cup.'}[S.goal.taste];
+}
+function tiles(){
+  const m=S.method,r=cur.rec,s=r.s,c=cur.s,R=r.r;
+  const G=grinderOf(s),g={k:'Grind',v:G.fmt(s.grind),u:G.short,n:G===GRINDERS.kultra?Math.round(s.grind*10)+' clicks from zero':'position '+G.fmt(s.grind)+' of '+G.max,key:'grind',y:G.fmt(c.grind)};
+  const dose={k:'Dose',v:s.dose.toFixed(1),u:'g',n:m==='espresso'&&S.goal.shot==='single'?'single basket':'double basket',key:'dose',y:c.dose.toFixed(1)+' g'};
+  const yld={k:'Yield',v:s.yield,u:'g',n:'ratio 1:'+(s.yield/s.dose).toFixed(1),key:'yield',y:c.yield+' g'};
+  if(m==='espresso')return[g,dose,yld,
+    {k:'Temperature',v:tName(s.temp),u:s.temp+' °C',n:'Dedica temperature setting',key:'temp',y:tName(c.temp)},
+    {k:'Shot time',v:R.time.toFixed(0),u:'s',n:'first drops near '+R.first.toFixed(0)+' s'},
+    {k:'Pressure',v:R.peak.toFixed(1),u:'bar',n:c.opv?'9-bar mod fitted':'stock pump and valve'}];
+  if(m==='cold')return[g,dose,yld,
+    {k:'Tank water',v:c.water,u:'°C',n:c.water<=10?'fridge cold':c.water<=24?'room temperature':'warm'},
+    {k:'Brew time',v:mmss(R.time),u:'min',n:'slow low-pressure pulses'},
+    {k:'Strength',v:R.tds.toFixed(1),u:'% TDS',n:S.goal.coldServe==='ice'?'allows for melting ice':'ready to drink'}];
+  return[s.pre?{k:'Grind',v:'Medium',u:'',n:'pre-ground coffee'}:g,
+    {k:'Coffee',v:s.dose,u:'g',n:'about '+(s.dose/NINJA.scoopG).toFixed(1)+' Ninja scoops',key:'dose',y:c.dose+' g'},
+    {k:'Water',v:s.cups,u:'cup line',n:(s.cups*NINJA.cupMl/1000).toFixed(2)+' L in the reservoir',key:'cups',y:c.cups+'-cup line'},
+    {k:'Brew style',v:s.style==='rich'?'RICH':'CLASSIC',u:'',n:s.small?'with 1-4 CUP on':'1-4 CUP off',key:'style',key2:'small',y:c.style.toUpperCase()+(c.small?', 1-4 CUP on':', 1-4 CUP off')},
+    {k:'Brew time',v:mmss(R.time),u:'min',n:'pre-infusion, then pulses'},
+    {k:'Strength',v:R.tds.toFixed(2),u:'% TDS',n:'golden cup: 1.15 to 1.45'}];
+}
+function why(){
+  const m=S.method,b=S.beans,g=S.goal,s=cur.rec.s,out=[];
+  const light=b.roast==='light'||b.roast==='medlight',dark=b.roast==='dark'||b.roast==='meddark',kg=grinderOf(cur.s)===GRINDERS.kg89;
+  if(kg&&m==='espresso'&&cur.s.basket!=='pressurized')out.push('The KG89 cannot grind fine enough for the unpressurized basket, so even its finest position runs fast. Use the pressurized basket, or the K-Ultra.');
+  else if(kg)out.push('The KG89 grinds less evenly than the K-Ultra, which costs a little sweetness and clarity.');
+  if(m==='espresso')out.push(light?'Lighter roast: finer grind, hotter water and a longer ratio to pull out enough sweetness.':dark?'Darker roast: coarser, cooler and shorter, so it stays sweet instead of ashy.':'Medium roast: the classic recipe at the middle temperature.');
+  else if(m==='cold')out.push('Cold water extracts far less, so the pump pulses slowly at low pressure and the grind '+(s.grind<4.2?'stays fine.':'is only a little coarser than espresso.'));
+  else out.push((light?'Lighter roast: a finer grind makes up for the fixed brew temperature. ':dark?'Darker roast: a coarser grind keeps the long drip from turning bitter. ':'')+gpl(s)+' g per litre is about '+(s.dose/(s.cups/2*NINJA.scoopG)).toFixed(1)+' times the Ninja scoop chart, which brews weak.');
+  if(m==='filter'){
+    if(s.small)out.push('1-4 CUP is on: small batches need the slower cycle to extract properly.');
+    out.push(s.style==='rich'?'RICH slows the water for a fuller cup that stands up to '+(g.serve==='ice'?'ice.':g.serve==='milk'?'milk.':'a bold taste.'):'CLASSIC keeps the cup clean and balanced.');
+  }
+  if(b.days<7)out.push('Beans are '+b.days+(b.days===1?' day':' days')+' off roast and still gassy. They peak from day 7.');
+  else if(b.days>21)out.push('At '+b.days+' days the beans are fading'+(m!=='filter'?' and flow faster, so the grind goes a touch finer.':'. Fresher beans would score higher.'));
+  if(m==='espresso'&&g.espServe==='milk')out.push('Pulled shorter and stronger so it cuts through milk.');
+  if(m!=='filter'&&cur.s.basket==='pressurized')out.push('The pressurized basket sets the flow itself: grind matters less and the ceiling is lower.');
+  return out.slice(0,4);
+}
+function renderRecipe(){
+  const m=S.method,r=cur.rec,c=cur.s,n=diffKeys(m,c,r).length,st=$('#recStatus'),a=$('#autoChip');
+  $('#recSub').textContent=(m==='filter'?'Ninja DCM201':'Dedica Duo')+' with the '+grinderOf(c).short;
+  $('#recTiles').innerHTML=tiles().map(t=>{
+    const off=t.key&&(c[t.key]!==r.s[t.key]||(t.key2&&c[t.key2]!==r.s[t.key2]));
+    return`<div class="tile${off?' off':''}"><div class="k">${t.k}</div><div class="v">${t.v}${t.u?`<small>${t.u}</small>`:''}</div><div class="n">${off?'yours: '+t.y:t.n}</div></div>`;
+  }).join('');
+  st.textContent=n?n+(n===1?' setting off':' settings off'):'Dialed in';st.dataset.tone=n?'warn':'good';
+  tickNum($('#recScore'),r.e.score);
+  $('#recPredText').innerHTML=`predicted cup score at these settings<br>extraction ${r.r.ey.toFixed(1)}%, strength ${r.r.tds.toFixed(m==='espresso'?1:2)}% TDS`;
+  $('#recWhy').innerHTML=why().map(t=>`<li>${t}</li>`).join('');
+  a.textContent=S.auto[m]?'Following the perfect settings':'Manual';a.dataset.tone=S.auto[m]?'good':'warn';
+}
+function led(sel,on){const e=$(sel+' .led');if(e)e.classList.toggle('on',!!on);}
+function renderDial(){
+  const m=S.method,s=cur.s,r=cur.rec.s,pre=m==='filter'&&s.pre,G=grinderOf(s),g=s.grind,um=grindUm(s),k=$('#knob');
+  if(knobFor!==G){knobFor=G;buildKnob(G);}
+  const dot=$('#knobRec'),ang=v=>-150+300*(clamp(v,G.min,G.max)-G.min)/(G.max-G.min);
+  $('#knobRot').style.transform=`rotate(${ang(g).toFixed(1)}deg)`;
+  $('#knobVal').textContent=G.fmt(g);$('#knobClicks').textContent=G===GRINDERS.kultra?Math.round(g*10)+' clicks':'of '+G.max;
+  const kUltra=G===GRINDERS.kultra,note=$('#grinderNote');
+  $('#knobZone').textContent=pre?'Pre-ground coffee':zoneUm(um);$('#knobMicron').textContent=kUltra||pre?'about '+um+' µm':'like K-Ultra '+((um-136)/68).toFixed(1);
+  note.textContent=kUltra?'':m==='filter'?`Count clicks from the fine end. The quantity dial is only a timer, about 5 to 6 g per cup mark, so weigh the ${s.dose} g${s.dose>75?' and grind it in two runs':''}.`
+    :`Count clicks from the fine end. Position 1 is about K-Ultra ${((G.um(G.min)-136)/68).toFixed(1)}: right for the pressurized basket, too coarse for the unpressurized one.`;
+  hide(note,kUltra);
+  $('#grinderName').textContent=G.name;
+  $$('#grinderSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.val===(s.grinder||'kultra')));
+  k.setAttribute('aria-label',G.name+' grind setting');k.setAttribute('aria-valuemin',G.min);k.setAttribute('aria-valuemax',G.max);
+  k.setAttribute('aria-valuenow',g);k.setAttribute('aria-valuetext',G.fmt(g)+', '+zoneUm(um));k.setAttribute('aria-disabled',pre);k.tabIndex=pre?-1:0;
+  const a=ang(r.grind)*Math.PI/180;dot.setAttribute('cx',(118+113.5*Math.sin(a)).toFixed(1));dot.setAttribute('cy',(118-113.5*Math.cos(a)).toFixed(1));hide(dot,pre);
+  $('#recipeSub').textContent=m==='filter'?gpl(s)+' g per litre':'ratio 1:'+(s.yield/s.dose).toFixed(1);
+  if(m==='filter'){
+    led('#mDelay',s.delay>0);led('#mSmall',s.small);led('#mClassic',s.style==='classic');led('#mRich',s.style==='rich');
+    led('#mBrew',brewing);led('#mClean',S.cleans>=NINJA.cleanAt);led('#mWarm',s.warm);renderLCD();
+  }else{
+    $$('#machinePanel .pbtn').forEach(b=>b.setAttribute('aria-pressed',b.dataset.val===(m==='cold'?'cold':S.goal.shot)));
+    $('#tleds').innerHTML=m==='cold'?`<span class="on"><i></i>Cold extraction, ${s.water} °C tank</span>`:[90,93,96].map(t=>`<span class="${s.temp===t?'on':''}"><i></i>${tName(t)}</span>`).join('');
+    led('#mBrew',brewing);
+  }
+  $('#machineHelp').textContent=helpMsg||(m==='filter'?'The panel matches your Ninja. BREW / OFF starts the simulation.':'Pick 1 cup, 2 cups or Cold. BREW starts the simulation.');
+}
+function renderResult(){
+  const ev=view.ev,res=view.res,m=view.m,brewed=view.kind==='brewed',k=$('#resKind'),fg=$('#ringFg'),ideal=cur.rec.e.taste;
+  k.textContent=brewed?'Brewed':'Predicted';k.dataset.tone=brewed?'accent':'';
+  $('#resSub').textContent=brewed?'How that brew turned out':'How these settings will taste';
+  tickNum($('#scoreVal'),ev.score);
+  fg.style.strokeDashoffset=289*(1-ev.score/100);fg.style.stroke=`var(--${ev.tone==='good'?'good':ev.tone==='warn'?'accent':'bad'})`;
+  $('#verdictT').textContent=ev.title;$('#verdictP').textContent=ev.text;
+  ['acid','sweet','body','bitter'].forEach(key=>{
+    const v=Math.round(ev.taste[key]*100);
+    $('#bf_'+key).style.width=v+'%';$('#bi_'+key).style.left=Math.round(ideal[key]*100)+'%';$('#bn_'+key).textContent=v;
+  });
+  $('#stats').innerHTML=[['Extraction',res.ey.toFixed(1)+'%'],['Strength',res.tds.toFixed(m==='espresso'?1:2)+'%'],['Time',m==='espresso'?res.time.toFixed(0)+' s':mmss(res.time)],
+    [m==='filter'?'Carafe':'In cup',m==='filter'?Math.round(res.out)+' ml':res.out.toFixed(0)+' g']].map(q=>`<div><div class="k">${q[0]}</div><div class="v">${q[1]}</div></div>`).join('');
+  if(m==='filter'){
+    const w=view.s.warm,h=S.hold;
+    $('#holdLabel').textContent=w?'Time on the warming plate':'Time standing, plate off';
+    $('#holdHint').textContent=h===0?'Straight from the brew':w?(h<=30?'Still fresh. The plate stays on for 2 hours by default':h<=75?'Starting to stew: bitterness is building':'Cooked. Time for a fresh pot'):(h<=20?'Still hot enough':'Cooling down: the flavors flatten');
+  }
+}
+function fixLabel(f,m){
+  const k=f.k,from=f.from,to=f.to;
+  switch(k){
+    case'grind':{const G=grinderOf(cur.s),n=Math.round(Math.abs(to-from)/G.step),unit=G===GRINDERS.kultra?'click':'position';return[to<from?'Grind finer':'Grind coarser',`${G.short} ${G.fmt(from)} to ${G.fmt(to)}, ${n} ${unit}${n===1?'':'s'}`];}
+    case'screen':return['Put the puck screen on top','Spreads the water evenly so it cannot dig channels'];
+    case'dose':return[to>from?'Use more coffee':'Use less coffee',`${from} g to ${to} g`];
+    case'yield':return[to>from?(m==='cold'?'Brew a longer drink':'Pull a longer shot'):(m==='cold'?'Brew a shorter drink':'Stop the shot earlier'),`${from} g to ${to} g in the cup`];
+    case'temp':return[to>from?'Brew hotter':'Brew cooler',`${tName(from)} to ${tName(to)}, ${to} °C`];
+    case'wdt':return['Stir the grounds before tamping','Breaks up clumps so water cannot channel'];
+    case'cups':return[`Fill water to the ${to}-cup line`,`You want ${to} cups, the reservoir is set to ${from}`];
+    case'style':return[`Switch to ${String(to).toUpperCase()}`,to==='rich'?'Slower water for a fuller, stronger cup':'Faster water for a cleaner, lighter cup'];
+    case'small':return[to?'Turn 1-4 CUP on':'Turn 1-4 CUP off',to?'Small batches need the slower cycle':'That cycle is only for 4 cups or fewer'];
+    case'delay':return['Brew now instead of using DELAY','Ground coffee loses aroma while it waits'];
+  }
+  return[k,''];
+}
+function renderFixes(){
+  const m=S.method,fx=cur.fix,b=S.beans,tips=[],base=clamp(fx.cur,0,100);
+  const shown=g=>{const d=Math.round(clamp(fx.cur+g,0,100)-base);return d>=1?'+'+d:'+';};
+  if(b.days<7)tips.push(['Let the beans rest',`They are ${b.days} ${b.days===1?'day':'days'} off roast. From day 7 the cup is calmer and sweeter.`]);
+  if(b.days>21)tips.push(['Buy fresher beans',`At ${b.days} days the aroma is fading, which caps the score whatever you dial in.`]);
+  const kg=grinderOf(cur.s)===GRINDERS.kg89;
+  if(kg&&m==='espresso'&&cur.s.basket!=='pressurized')tips.push(['Wrong basket for the KG89','Its finest position is still too coarse for the unpressurized basket. Switch to the pressurized basket, or grind on the K-Ultra.']);
+  if(m!=='filter'&&cur.s.basket==='pressurized'&&!kg)tips.push(['Try the unpressurized basket','It rewards a good grind with more sweetness and real crema.']);
+  if(m==='filter'&&cur.s.pre)tips.push(['Grind fresh on the K-Ultra','Pre-ground coffee has already lost part of its aroma.']);
+  if(m==='filter'&&S.cleans>=NINJA.cleanAt)tips.push(['Run a CLEAN cycle','Scale is slowing the water and cooling the brew. Press CLEAN on the panel.']);
+  if(m==='filter'&&S.hold>30&&cur.s.warm)tips.push(['Pour it sooner','The warming plate stews coffee. Best within 30 minutes, or decant into a flask.']);
+  const list=fx.list.filter(f=>f.gain>.4);let h;
+  if(list.length)h=list.slice(0,4).map(f=>{const l=fixLabel(f,m);return`<div class="fix"><span class="gain">${shown(f.gain)}</span><div class="txt">${l[0]}<small>${l[1]}</small></div><button class="btn sm" data-act="fix" data-val="${f.k}">Apply</button></div>`;}).join('');
+  else if(fx.list.length)h=`<div class="fix"><span class="gain">${shown(fx.total)}</span><div class="txt">Apply the perfect settings together<small>These changes only pay off as a set</small></div><button class="btn sm" data-act="dial">Apply</button></div>`;
+  else h='<div class="empty"><b>Nothing to change</b>Your settings match the perfect recipe for these beans and this cup.</div>';
+  setList($('#fixes'),h+tips.slice(0,3).map(t=>`<div class="empty"><b>${t[0]}</b>${t[1]}</div>`).join(''),m+'|'+list.map(f=>f.k).join()+'|'+fx.list.length+'|'+tips.map(t=>t[0]).join());
+}
+function renderChart(){
+  const m=view.m,T=view.ev.T,x0=40,x1=312,y0=10,y1=172,eLo=12,eHi=28;
+  const X=e=>x0+(clamp(e,eLo,eHi)-eLo)/(eHi-eLo)*(x1-x0),Y=t=>y1-(clamp(t,T.yLo,T.yHi)-T.yLo)/(T.yHi-T.yLo)*(y1-y0);
+  const zx=X(T.ey-1),zw=X(T.ey+1)-zx,zy=Y(T.tds*1.08),zh=Y(T.tds*.92)-zy,dp=m==='espresso'?0:m==='cold'&&T.yHi>5?0:1;
+  let h='<svg viewBox="0 0 320 204" role="img" aria-label="Strength against extraction, with the ideal zone">';
+  for(let e=14;e<=26;e+=4)h+=`<line class="axis" x1="${X(e)}" y1="${y0}" x2="${X(e)}" y2="${y1}"/><text x="${X(e)}" y="${y1+13}" text-anchor="middle">${e}%</text>`;
+  for(let i=0;i<=3;i++){const v=T.yLo+(T.yHi-T.yLo)*i/3;h+=`<line class="axis" x1="${x0}" y1="${Y(v)}" x2="${x1}" y2="${Y(v)}"/><text x="${x0-6}" y="${Y(v)+3}" text-anchor="end">${v.toFixed(dp)}</text>`;}
+  h+=`<rect class="zone" x="${zx}" y="${zy}" width="${zw}" height="${zh}" rx="5"/><rect class="zone-st" x="${zx}" y="${zy}" width="${zw}" height="${zh}" rx="5"/>`;
+  h+=`<text class="lab" x="${x0+6}" y="${y1-7}">sour, weak</text><text class="lab" x="${x1-6}" y="${y0+12}" text-anchor="end">bitter, strong</text>`;
+  h+=`<text x="${(x0+x1)/2}" y="200" text-anchor="middle">extraction yield</text><text transform="translate(9 ${(y0+y1)/2}) rotate(-90)" text-anchor="middle">strength, % TDS</text>`;
+  S.log.filter(e=>e.m===m).slice(0,8).forEach(e=>{h+=`<circle class="old" cx="${X(e.ey)}" cy="${Y(e.tds)}" r="3.2"/>`;});
+  h+=`<circle class="rec" cx="${X(cur.rec.r.ey)}" cy="${Y(cur.rec.r.tds)}" r="7"/><circle class="cur" cx="${X(view.res.ey)}" cy="${Y(view.res.tds)}" r="5"/></svg>`;
+  $('#cc').innerHTML=h+'<div class="cc-legend"><span><i style="background:var(--ink)"></i>this cup</span><span><i style="box-shadow:inset 0 0 0 2px var(--accent)"></i>perfect settings</span><span><i style="background:var(--accent);opacity:.3;border-radius:3px"></i>ideal zone</span><span><i style="background:var(--ink-2);opacity:.45"></i>past brews</span></div>';
+}
+function renderLog(){
+  const el=$('#log');hide($('#logClear'),!S.log.length);el.classList.toggle('scroll',S.log.length>4);
+  if(!S.log.length){setList(el,'<div class="empty"><b>No brews yet</b>Run a brew and it lands here. Reload its settings, or compare its curves with your next one.</div>','none');return;}
+  setList(el,S.log.map(e=>{
+    const s=e.s,G=grinderOf(s),gs=G.short+' '+G.fmt(+s.grind),d=e.m==='filter'?`${s.pre?'pre-ground':gs} · ${s.dose} g · ${s.cups} cups · ${s.style}`:`${gs} · ${s.dose} to ${s.yield} g${e.m==='espresso'?' · '+s.temp+'°':''}`;
+    return`<div class="log-item"><div class="sc" data-tone="${esc(e.tone)}">${+e.score}</div><div style="min-width:0"><div class="t">${METHODS[e.m].name} · ${ROASTS[e.roast].name} · ${esc(e.title)}</div><div class="d">${d} · ${e.m==='espresso'?(+e.time).toFixed(0)+' s':mmss(e.time)}</div></div><div class="acts"><button class="btn sm" data-act="logload" data-val="${+e.id}">Load</button><button class="btn sm" data-act="logghost" data-val="${+e.id}" aria-pressed="${!!(S.ghost&&S.ghost.id===e.id)}">Compare</button></div></div>`;
+  }).join(''),S.log.map(e=>e.id).join());
+}
+
+/* ---------- brew stage and live readouts ---------- */
+function sparkCfg(res,s){
+  const mx=i=>res.series.reduce((a,p)=>Math.max(a,p[i]),0);
+  return res.kind==='pump'?[{i:1,max:16,u:'bar'},{i:2,max:Math.max(3,mx(2)*1.15),u:'g/s'},{i:3,max:Math.max(s.yield,res.out)*1.08,u:'g'}]
+    :[{i:1,max:Math.min(res.cap,Math.max(res.peak*1.3,res.cap*.5)),u:'ml'},{i:2,max:Math.max(3,mx(2)*1.15),u:'ml/s'},{i:3,max:res.W*1.02,u:'ml'}];
+}
+function pathOf(series,i,T,max){let d='';for(const p of series)d+=(d?'L':'M')+(p[0]/T*300).toFixed(1)+' '+(46-clamp(p[i]/max,0,1)*44).toFixed(1);return d;}
+function setSparks(res,s,ghost,full){
+  const cfg=sparkCfg(res,s);sparkT=Math.max(res.time,ghost?ghost.time:0)||1;
+  cfg.forEach((c,n)=>{
+    $('#spPath'+n).setAttribute('d',pathOf(res.series,c.i,sparkT,c.max));
+    $('#spGhost'+n).setAttribute('d',ghost?pathOf(ghost.series,c.i,sparkT,c.max):'');
+    $('#spRect'+n).setAttribute('width',full?300:0);
+    $('#spMax'+n).textContent='max '+(c.max>=20?Math.round(c.max):c.max.toFixed(1))+' '+c.u;
+  });
+  $('#sparkEnd').textContent=S.method==='espresso'?sparkT.toFixed(0)+' s':mmss(sparkT)+' min';
+}
+function sample(res,t){
+  const a=res.series,n=a.length;if(t>=a[n-1][0])return a[n-1];
+  const st=a[1][0]-a[0][0]||1;let i=Math.min(n-2,Math.max(0,Math.floor(t/st)));
+  while(i>0&&a[i][0]>t)i--;
+  const p=a[i],q=a[i+1],f=clamp((t-p[0])/((q[0]-p[0])||1),0,1);
+  return p.map((v,k)=>v+(q[k]-v)*f);
+}
+function setRO(id,v,u){$('#ro'+id).innerHTML=v+(u?`<small>${u}</small>`:'');}
+function stagePump(q,s,m,live){
+  const R=ROASTS[S.beans.roast],P=q&&live?q[1]:0,Q=q&&live?q[2]:0,y=q?q[3]:0,cold=m==='cold';
+  const H=cold?97:61,h=clamp(y/(cold?190:75),0,1)*H,top=257-h,st=$('#eStream');
+  $('#eNeedle').setAttribute('transform',`rotate(${(-120+240*clamp(P/15,0,1)).toFixed(1)} 150 68)`);
+  $('#eBar').textContent=P.toFixed(1);
+  if(cold)setA('#eLiqCold',{y:top,height:h});
+  else{
+    const cr=Math.min(h,h>0?Math.max(2.5,h*(.14+.22*fresh(S.beans.days).co2)):0);
+    setA('#eLiqHot',{y:top,height:h});setA('#eCremaHot',{y:top,height:cr,fill:R.crema});
+  }
+  setA('#eStream',{opacity:Q>.05?1:0,'stroke-width':clamp(1+Q*1.3,1.2,5.5).toFixed(1),stroke:cold?'#6b3d1a':R.crema,y2:Math.max(150,top)});
+  st.classList.toggle('drip',cold&&Q>.05);
+  $('#eScale').textContent=y.toFixed(1)+' g';
+}
+function stageDrip(q,res,s,live,mode){
+  const full=NINJA.maxCups*NINJA.cupMl,W=s.cups*NINJA.cupMl,del=q?q[5]:0,V=q?q[1]:0,qo=q&&live?q[2]:0,out=q?q[3]:0;
+  const hR=clamp((W-del)/full,0,1)*158,gh=3+9*clamp(s.dose/130,0,1),wh=clamp(V/res.cap,0,1)*(22-gh),hC=clamp(out/full,0,1)*66,d=$('#nDrip');
+  setA('#nRes',{y:218-hR,height:hR});
+  setA('#nBed',{y:178-gh,height:gh});setA('#nBedWater',{y:178-gh-wh,height:wh});
+  setA('#nCoffee',{y:262-hC,height:hC});
+  setA('#nDrip',{opacity:qo>.05?1:0,y2:262-hC});d.classList.toggle('drip',qo>.05);
+  $('#nWarm').setAttribute('opacity',(live||mode==='done')&&s.warm?.9:0);
+  $('#nLed').setAttribute('fill',live?'#ffffff':'#353638');
+}
+function drawFrame(res,t,s,m,mode){
+  const live=mode==='live',pump=res.kind==='pump',p=live?sample(res,t):res.series[res.series.length-1];
+  const out=pump?p[3]:p[3]*.99,ey=p[4]/s.dose*100,tds=out>1?p[4]/out*100:0;
+  setRO('T',m==='espresso'?t.toFixed(1):mmss(t),m==='espresso'?'s':'min');
+  if(pump){
+    setRO('A',(live?p[1]:res.peak).toFixed(1),live?'bar':'bar peak');
+    setRO('B',(live?p[2]:res.out/Math.max(1,res.time-res.first)).toFixed(2),live?'g/s':'g/s avg');
+    setRO('C',out.toFixed(1),'g');
+  }else{
+    setRO('A',res.Tb.toFixed(0),'°C');
+    setRO('B',(live?p[2]:res.out/res.time).toFixed(1),live?'ml/s':'ml/s avg');
+    setRO('C',Math.round(out),'ml');
+  }
+  setRO('E',ey.toFixed(1),'%');setRO('S',tds.toFixed(m==='espresso'?1:2),'% TDS');
+  if(live)for(let n=0;n<3;n++)$('#spRect'+n).setAttribute('width',(t/sparkT*300).toFixed(1));
+  const q=mode==='idle'?null:p;
+  if(pump)stagePump(q,s,m,live);else stageDrip(q,res,s,live,mode);
+}
+function renderBrewIdle(){
+  const brewed=view.kind==='brewed',m=S.method,ch=$('#phaseChip');
+  setSparks(view.res,view.s,S.ghost&&S.ghost.m===m?S.ghost:null,true);
+  drawFrame(view.res,view.res.time,view.s,m,brewed?'done':'idle');
+  ch.textContent=brewed?'Done':'Ready';ch.dataset.tone=brewed?'good':'';
+  $('#brewSub').textContent=brewed?'The brew you just made':'The curves show the predicted brew for the settings above';
+}
+function phaseName(r,p){
+  const res=r.res;
+  if(r.m==='filter'){if(res.bloomEnd!==null&&r.t<res.bloomEnd)return'Pre-infusion';return p[5]<res.W-1?'Brewing':'Dripping through';}
+  if(r.t<res.first)return r.m==='cold'?'Wetting the puck':'Pre-infusion';
+  return r.m==='cold'?'Cold pulses':'Extracting';
+}
+const thin=a=>{const st=Math.ceil(a.length/90),o=[];for(let i=0;i<a.length;i+=st)o.push(a[i].slice(0,4).map(v=>+v.toFixed(2)));o.push(a[a.length-1].slice(0,4).map(v=>+v.toFixed(2)));return o;};
+
+function startBrew(){
+  if(brewing){cancelBrew(true);return;}
+  compute();
+  const m=S.method,s=Object.assign({},S.set[m]),rng=mulberry32((Date.now()^Math.floor(Math.random()*1e9))>>>0);
+  const res=simulate(m,S.beans,S.goal,s,Object.assign({rng},simO())),prev=S.log.find(e=>e.m===m);
+  run={m,s,res,beans:Object.assign({},S.beans),goal:Object.assign({},S.goal),t:0,last:performance.now(),stamp:stamp()};
+  setBrewing(true);S.hold=0;lcdMode='clock';
+  setSparks(res,s,S.ghost&&S.ghost.m===m?S.ghost:prev||null,false);
+  soundStart(m);renderTop();renderDial();
+  $('#brewSub').textContent='Brewing at '+S.speed[m]+'× speed'+(prev?'. Dashed lines are your last brew':'');
+  raf=requestAnimationFrame(tick);
+}
+function tick(now){
+  if(!brewing)return;
+  const dt=clamp((now-run.last)/1000,0,.25);run.last=now;run.t+=dt*S.speed[run.m];
+  if(run.t>=run.res.time){finishBrew();return;}
+  drawFrame(run.res,run.t,run.s,run.m,'live');
+  const p=sample(run.res,run.t),ch=$('#phaseChip');ch.dataset.tone='accent';ch.textContent=phaseName(run,p);
+  soundLevel(run.m==='filter'?clamp(p[2]/4,0,1)*.6:clamp(p[1]/12,0,1));
+  if(run.m==='filter')renderLCD();
+  raf=requestAnimationFrame(tick);
+}
+function finishBrew(){
+  setBrewing(false);soundStop();
+  const m=run.m,s=run.s,res=run.res,ev=evaluate(m,run.beans,run.goal,s,res,{});
+  S.log.unshift({id:Date.now(),m,roast:run.beans.roast,days:run.beans.days,s,score:ev.score,tone:ev.tone,title:ev.title,ey:+res.ey.toFixed(2),tds:+res.tds.toFixed(3),time:+res.time.toFixed(1),series:thin(res.series)});
+  S.log=S.log.slice(0,12);
+  if(m==='filter')S.cleans++;
+  view={kind:'brewed',res,stamp:stamp(),m,beans:run.beans,goal:run.goal,s};
+  run=null;compute();render();save();
+  toast(ev.title+'. Cup score '+ev.score);
+  if(ev.score>=95)confetti();
+}
+function cancelBrew(notify){
+  if(!brewing)return;
+  setBrewing(false);cancelAnimationFrame(raf);soundStop();run=null;
+  if(notify){refresh();toast('Brew stopped');}
+}
+
+/* ---------- sound ---------- */
+let AC=null,snd=null;
+function soundStart(m){
+  if(!S.sound)return;
+  try{
+    AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();soundStop();
+    const g=AC.createGain(),nodes=[],buf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate),ch=buf.getChannelData(0);
+    for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1;
+    g.gain.value=0;g.connect(AC.destination);
+    const nz=AC.createBufferSource(),bp=AC.createBiquadFilter(),ng=AC.createGain();
+    nz.buffer=buf;nz.loop=true;bp.type='bandpass';bp.frequency.value=m==='filter'?1100:700;bp.Q.value=.8;ng.gain.value=m==='filter'?.05:.012;
+    nz.connect(bp);bp.connect(ng);ng.connect(g);nz.start();nodes.push(nz);
+    if(m!=='filter'){const o=AC.createOscillator(),lp=AC.createBiquadFilter(),og=AC.createGain();o.type='sawtooth';o.frequency.value=50;lp.type='lowpass';lp.frequency.value=180;og.gain.value=.05;o.connect(lp);lp.connect(og);og.connect(g);o.start();nodes.push(o);}
+    snd={g,nodes};
+  }catch(e){snd=null;}
+}
+function soundLevel(v){if(snd)snd.g.gain.setTargetAtTime(v,AC.currentTime,.06);}
+function soundStop(){
+  if(!snd)return;
+  try{snd.g.gain.setTargetAtTime(0,AC.currentTime,.04);const n=snd.nodes;setTimeout(()=>n.forEach(x=>{try{x.stop();}catch(e){}}),250);}catch(e){}
+  snd=null;
+}
+
+/* ---------- sync inputs, render all ---------- */
+function sync(){
+  const m=S.method;
+  $$('input[data-range]').forEach(inp=>{
+    const p=inp.dataset.range,v=getPath(p);if(v===undefined)return;
+    if(+inp.value!==v)inp.value=v;
+    const min=+inp.min,max=+inp.max,k=p.split('.')[1],rec=$('.rec',inp.parentNode),out=$(`[data-out="${p}"]`),hint=$(`[data-hint="${p}"]`);
+    inp.style.setProperty('--p',((v-min)/(max-min)*100).toFixed(1)+'%');
+    if(out)out.textContent=fmtOut(p);
+    if(hint)hint.textContent=hintFor(p);
+    if(rec){const show=p.indexOf('set.')===0&&TUNE[m].includes(k);hide(rec,!show);if(show)rec.style.setProperty('--r',clamp((cur.rec.s[k]-min)/(max-min),0,1).toFixed(3));}
+  });
+  $$('[data-seg]').forEach(sg=>{
+    const p=sg.dataset.seg,v=String(getPath(p)),k=p.split('.')[1],mark=p.indexOf('set.')===0&&TUNE[m].includes(k);
+    $$('button',sg).forEach(b=>{b.setAttribute('aria-pressed',b.dataset.val===v);b.classList.toggle('is-rec',mark&&String(cur.rec.s[k])===b.dataset.val&&b.dataset.val!==v);});
+  });
+  $$('[data-toggle]').forEach(b=>b.setAttribute('aria-pressed',!!getPath(b.dataset.toggle)));
+  placePills();
+}
+
+/* ---------- motion details (count-up, sliding pills, list entrance, ripple, confetti) ---------- */
+const reduceMotion=()=>!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+function tickNum(el,to){
+  const from=el._v===undefined?to:el._v;
+  if(from===to||reduceMotion()){el.textContent=to;el._v=to;el._id=(el._id||0)+1;return;}
+  const t0=performance.now(),id=el._id=(el._id||0)+1;
+  (function step(t){
+    if(el._id!==id)return;
+    const p=Math.min(1,Math.max(0,(t-t0)/420)),v=Math.round(from+(to-from)*(1-Math.pow(1-p,3)));
+    el.textContent=v;el._v=v;if(p<1)requestAnimationFrame(step);
+  })(t0);
+}
+function placePills(instant){
+  $$('.seg').forEach(sg=>{
+    let pill=sg.querySelector('.pill'),isNew=false;
+    if(!pill){pill=document.createElement('i');pill.className='pill';sg.prepend(pill);isNew=true;}
+    const b=sg.querySelector('button[aria-pressed="true"]');
+    if(isNew||instant)pill.style.transition='none';
+    if(b){pill.style.setProperty('--x',b.offsetLeft+'px');pill.style.setProperty('--w',b.offsetWidth+'px');pill.style.opacity=1;}else pill.style.opacity=0;
+    if(isNew||instant){void pill.offsetWidth;pill.style.transition='';}
+  });
+}
+function setList(el,html,sig){
+  if(el._html===html)return;
+  const changed=el._sig!==sig;el._html=html;el._sig=sig;
+  el.classList.toggle('enter',changed&&!reduceMotion());
+  el.innerHTML=html;
+  Array.from(el.children).forEach((c,i)=>c.style.setProperty('--i',i));
+}
+function setBrewing(on){
+  brewing=on;$('#cardBrew').classList.toggle('is-brewing',on);$('#brewSub').classList.toggle('shimmer',on);
+}
+function confetti(){
+  if(reduceMotion())return;
+  const c=document.createElement('canvas'),x=c.getContext('2d'),W=c.width=window.innerWidth,H=c.height=window.innerHeight,P=[];
+  const cols=['#cf7a3a','#e8a05a','#f3d9b1','#84491c','#74d0a0'],r=$('#scoreVal').getBoundingClientRect(),ox=r.left+r.width/2,oy=r.top+r.height/2;
+  c.className='confetti';document.body.appendChild(c);
+  for(let i=0;i<80;i++){const a=Math.random()*Math.PI*2,v=4+Math.random()*7;P.push({x:ox,y:oy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-4,s:3+Math.random()*4,c:cols[i%cols.length],r:Math.random()*6,vr:(Math.random()-.5)*.4});}
+  let n=0;
+  (function f(){
+    x.clearRect(0,0,W,H);
+    P.forEach(p=>{p.vy+=.22;p.vx*=.985;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.globalAlpha=Math.max(0,1-n/110);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*1.6);x.restore();});
+    if(++n<110)requestAnimationFrame(f);else c.remove();
+  })();
+}
+if(window.matchMedia&&matchMedia('(hover:hover) and (pointer:fine)').matches)document.addEventListener('pointermove',e=>{
+  const c=e.target.closest&&e.target.closest('.card');if(!c)return;
+  const r=c.getBoundingClientRect();c.style.setProperty('--mx',(e.clientX-r.left)+'px');c.style.setProperty('--my',(e.clientY-r.top)+'px');
+},{passive:true});
+document.addEventListener('pointerdown',e=>{
+  const b=e.target.closest&&e.target.closest('.btn.primary');if(!b||reduceMotion())return;
+  const r=b.getBoundingClientRect(),d=Math.max(r.width,r.height),s=document.createElement('span');
+  s.className='rip';s.style.cssText=`width:${d}px;height:${d}px;left:${e.clientX-r.left-d/2}px;top:${e.clientY-r.top-d/2}px`;
+  b.appendChild(s);s.addEventListener('animationend',()=>s.remove());
+});
+window.addEventListener('resize',()=>placePills(true));
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>placePills(true));
+function render(){
+  const m=S.method;
+  document.body.dataset.method=m;
+  if(builtFor!==m){builtFor=m;buildMethodUI();}
+  renderTop();renderBeans();renderRecipe();renderDial();renderResult();renderFixes();renderChart();renderLog();
+  if(!brewing)renderBrewIdle();
+  sync();
+}
+let toastT=0;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);}
+
+/* ---------- actions ---------- */
+function setGrind(v){
+  const s=S.set[S.method],G=grinderOf(s);
+  v=clamp(+(Math.round(v/G.step)*G.step).toFixed(2),G.min,G.max);if(s.grind===v)return;
+  cancelBrew();s.grind=v;S.auto[S.method]=false;refresh();
+}
+function act(a,v){
+  const m=S.method,s=S.set[m];
+  switch(a){
+    case'method':if(v!==m){cancelBrew();S.method=v;S.hold=0;refresh();}break;
+    case'roast':cancelBrew();S.beans.roast=v;refresh();break;
+    case'theme':{const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;try{localStorage.setItem('brewlab.theme',t);}catch(e){}renderTop();break;}
+    case'sound':S.sound=!S.sound;if(!S.sound)soundStop();else if(brewing)soundStart(run.m);renderTop();save();break;
+    case'dial':cancelBrew();S.auto[m]=true;S.hold=0;if(m==='filter')helpMsg='';refresh();toast('Grinder and machine set to the perfect settings');break;
+    case'brew':startBrew();break;
+    case'speed':S.speed[m]=+v;renderTop();placePills();save();if(brewing)$('#brewSub').textContent='Brewing at '+v+'× speed';break;
+    case'kminus':setGrind(s.grind-grinderOf(s).step);break;
+    case'kplus':setGrind(s.grind+grinderOf(s).step);break;
+    case'grinder':{
+      if((s.grinder||'kultra')===v||!GRINDERS[v])break;
+      cancelBrew();const um=grindUm(Object.assign({},s,{pre:false}));      /* keep the same grind size on the new dial */
+      s.grinder=v;s.grind=nearestGrind(GRINDERS[v],um);refresh();break;
+    }
+    case'fix':setPath('set.'+v,cur.rec.s[v]);if(!diffKeys(m,S.set[m],cur.rec).length)S.auto[m]=true;refresh();break;
+    case'prog':cancelBrew();if(v==='cold')S.method='cold';else{S.method='espresso';S.goal.shot=v;}refresh();break;
+    case'style':setPath('set.style',v);helpMsg=v==='rich'?'RICH: slower water and a longer soak. Fuller and stronger, good with milk or ice.':'CLASSIC: the standard cycle. Smooth and balanced for drinking black.';refresh();break;
+    case'small':setPath('set.small',!s.small);helpMsg=s.small?'1-4 CUP on: a slower cycle for 4 cups or fewer. Fill no higher than the 4-cup line.':'1-4 CUP off: the normal cycle for 5 cups and up.';refresh();break;
+    case'warm':setPath('set.warm',!s.warm);helpMsg=s.warm?'WARM on: the plate holds the carafe hot for 2 hours, adjustable up to 4.':'WARM off: no stewing on the plate, but the coffee cools.';refresh();break;
+    case'delay':setPath('set.delay',s.delay>0?0:8);helpMsg=s.delay>0?'DELAY set: brewing starts in '+fmtDelay(s.delay)+'. Use H and M to change it. The grounds wait in the basket.':'DELAY off: it brews as soon as you press BREW.';refresh();break;
+    case'dh':case'dm':
+      if(!(s.delay>0)){helpMsg='Press DELAY first, then set the start time with H and M.';renderDial();break;}
+      {let d=s.delay+(a==='dh'?1:1/6);if(d>24.001)d-=24;setPath('set.delay',Math.round(d*6)/6);helpMsg='Brewing starts in '+fmtDelay(s.delay)+'.';refresh();}
+      break;
+    case'fresh':lcdMode=lcdMode==='fresh'?'clock':'fresh';helpMsg=lcdMode==='fresh'?'Freshness timer: time since the brew finished. Use the slider under the cup score to let the pot sit.':'';renderDial();break;
+    case'clean':{const due=S.cleans>=NINJA.cleanAt;cancelBrew();S.cleans=0;helpMsg=due?'Clean cycle done. On the machine it takes 25 to 35 minutes with descaler, then one water-only brew.':'Clean cycle run. The light comes on by itself once scale builds up.';refresh();break;}
+    case'logload':{const e=S.log.find(q=>q.id===+v);if(!e)break;cancelBrew();S.method=e.m;S.beans.roast=e.roast;S.beans.days=e.days;S.beans.date='';S.set[e.m]=Object.assign({},S.set[e.m],{grinder:'kultra'},e.s);S.auto[e.m]=false;S.hold=0;refresh();toast('Loaded that brew’s beans and settings');break;}
+    case'logghost':{const e=S.log.find(q=>q.id===+v);if(!e)break;S.ghost=S.ghost&&S.ghost.id===e.id?null:{id:e.id,m:e.m,time:e.time,series:e.series};if(S.ghost&&S.ghost.m!==m)toast('Switch to '+METHODS[e.m].name+' to see that curve');refresh();break;}
+    case'logclear':S.log=[];S.ghost=null;refresh();break;
+  }
+}
+const fmtDelay=h=>{const mins=Math.round(h*60);return Math.floor(mins/60)+' h '+String(mins%60).padStart(2,'0')+' min';};
+
+document.addEventListener('click',e=>{
+  const sb=e.target.closest('[data-seg] button');
+  if(sb){setPath(sb.parentNode.dataset.seg,parse(sb.dataset.val));refresh();return;}
+  const tg=e.target.closest('[data-toggle]');
+  if(tg){setPath(tg.dataset.toggle,!getPath(tg.dataset.toggle));refresh();return;}
+  const a=e.target.closest('[data-act]');
+  if(a)act(a.dataset.act,a.dataset.val);
+});
+document.addEventListener('input',e=>{
+  const r=e.target.closest('input[data-range]');
+  if(r){setPath(r.dataset.range,+r.value);refresh();}
+});
+$('#roastDate').addEventListener('change',e=>{
+  const v=e.target.value;cancelBrew();
+  if(!v){S.beans.date='';refresh();return;}
+  const n=daysFrom(v);if(n){S.beans.date=v;S.beans.days=n;refresh();}
+});
+
+/* knob: drag around the dial, or use the arrow keys */
+(function(){
+  const knob=$('#knob');let kd=null;
+  const ang=e=>{const r=knob.getBoundingClientRect();return Math.atan2(e.clientX-(r.left+r.width/2),-(e.clientY-(r.top+r.height/2)))*180/Math.PI;};
+  knob.addEventListener('pointerdown',e=>{if(knob.getAttribute('aria-disabled')==='true')return;knob.setPointerCapture(e.pointerId);kd={a:ang(e),v:S.set[S.method].grind};e.preventDefault();knob.focus();knob.classList.add('dragging');});
+  knob.addEventListener('pointermove',e=>{
+    if(!kd)return;const a=ang(e);let d=a-kd.a;if(d>180)d-=360;if(d<-180)d+=360;
+    const G=grinderOf(S.set[S.method]);kd.a=a;kd.v=clamp(kd.v+d*(G.max-G.min)/300,G.min,G.max);setGrind(kd.v);
+  });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>knob.addEventListener(ev,()=>{kd=null;knob.classList.remove('dragging');}));
+  knob.addEventListener('keydown',e=>{
+    const G=grinderOf(S.set[S.method]),big=G===GRINDERS.kultra?10:3,k={ArrowUp:1,ArrowRight:1,ArrowDown:-1,ArrowLeft:-1,PageUp:big,PageDown:-big}[e.key];
+    if(k){e.preventDefault();setGrind(S.set[S.method].grind+k*G.step);}
+  });
+})();
+
+buildStatic();compute();render();
+setInterval(()=>{if(S.method==='filter'&&!brewing)renderLCD();},15000);
+window.BrewLab={get state(){return S;},get cur(){return cur;},get view(){return view;}};
+})();
+</script>
+</body>
+</html>
